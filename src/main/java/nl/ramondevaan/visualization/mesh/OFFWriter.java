@@ -1,5 +1,7 @@
 package nl.ramondevaan.visualization.mesh;
 
+import nl.ramondevaan.visualization.utilities.DataUtils;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -9,18 +11,6 @@ import java.text.DecimalFormatSymbols;
 import java.util.Locale;
 
 public class OFFWriter extends MeshWriter {
-    private final static DecimalFormat NUMBER_FORMAT;
-    
-    static {
-        DecimalFormatSymbols s = new DecimalFormatSymbols(Locale.US);
-        
-        NUMBER_FORMAT = new DecimalFormat();
-        NUMBER_FORMAT.setDecimalFormatSymbols(s);
-        NUMBER_FORMAT.setGroupingUsed(false);
-        NUMBER_FORMAT.setMaximumFractionDigits(340);
-        NUMBER_FORMAT.setDecimalSeparatorAlwaysShown(false);
-    }
-    
     @Override
     protected void write() throws FileNotFoundException {
         PrintWriter pw = new PrintWriter(new FileOutputStream(file, false));
@@ -33,7 +23,7 @@ public class OFFWriter extends MeshWriter {
     
         for(int i = 0; i < mesh.coordinates.length; i++) {
             for(int j = 0; j < mesh.dimensionality; j++) {
-                pw.print(NUMBER_FORMAT.format(mesh.coordinates[i][j]));
+                pw.print(DataUtils.NUMBER_FORMAT.format(mesh.coordinates[i][j]));
                 pw.print(' ');
             }
             pw.println();

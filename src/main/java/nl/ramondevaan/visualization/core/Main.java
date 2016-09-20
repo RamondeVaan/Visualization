@@ -2,9 +2,7 @@ package nl.ramondevaan.visualization.core;
 
 import nl.ramondevaan.visualization.data.DataInt;
 import nl.ramondevaan.visualization.data.DataType;
-import nl.ramondevaan.visualization.image.Image;
-import nl.ramondevaan.visualization.image.ImageRegionIterator;
-import nl.ramondevaan.visualization.image.MetaImageReader;
+import nl.ramondevaan.visualization.image.*;
 import nl.ramondevaan.visualization.mesh.*;
 
 import java.io.FileInputStream;
@@ -20,9 +18,6 @@ public class Main {
 //        MeshReader reader = new AutoMeshReader();
 //        MeshWriter writer = new AutoMeshWriter();
 //
-//        reader.setPath("C:\\Users\\310240452\\SharePoint\\Kustra, Jacek\\itgk\\sharedRamon\\data\\prostate_hd.ply");
-//        writer.setPath("C:\\Users\\310240452\\Desktop\\Test.ply");
-//
 //        MeshShifter shifter = new MeshShifter();
 //        shifter.setShift(new float[]{50, 0, 0});
 //
@@ -36,10 +31,24 @@ public class Main {
 //            e.printStackTrace();
 //        }
 
-        ByteBuffer b = ByteBuffer.allocate(4).putFloat(4f);
+        ImageReader reader = new AutoImageReader();
+        ImageWriter writer = new AutoImageWriter();
+        ImageShifter shifter = new ImageShifter();
         
-        b.rewind();
-        System.out.println("MSB: " + b.getFloat());
+        reader.setPath("C:\\Users\\310240452\\SharePoint\\Kustra, Jacek\\itgk\\sharedRamon\\data\\TRUS3DPhantomSequence0.mhd");
+        writer.setPath("C:\\Users\\310240452\\Desktop\\Test\\Test\\Transform.mhd");
+        shifter.setShift(new int[]{30, 0, 0});
+    
+        try {
+            reader.update();
+            shifter.setInput(reader.getOutput());
+            shifter.update();
+            writer.setImage(shifter.getOutput());
+            writer.update();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
 
 //        DataType dataType = new DataInt();
 //        int dimensionality = 3;

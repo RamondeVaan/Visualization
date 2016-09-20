@@ -1,5 +1,8 @@
 package nl.ramondevaan.visualization.image;
 
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
 public class ImageRegionIterator {
     private final int dimensionality;
     private final int dmin1;
@@ -8,15 +11,14 @@ public class ImageRegionIterator {
     private final int[] max;
     private final int[] cur;
     private final int[] skip;
-    private final byte[] values;
-    private int curLoc;
+    private final ByteBuffer values;
     private int curDim;
     
     public ImageRegionIterator(Image image, int[] region) {
         this.dimensionality = image.dimensionality;
         this.dmin1 = this.dimensionality - 1;
         this.image = image;
-        if(region.length != dimensionality * 2) {
+        if(region.length != image.extent.length) {
             throw new IllegalArgumentException("Region dimensionality did not match image dimensionality");
         }
         this.min = new int[dimensionality];
@@ -50,9 +52,9 @@ public class ImageRegionIterator {
             skip[i] = (min[k] + image.dimensions[k] - max[k] - 1) * num * image.dataType.numBytes;
         }
         skip[dmin1] = image.dataType.numBytes;
-        curLoc = locAtPos(min);
+        values = image.values;
+        values.position(locAtPos(min));
         curDim = dmin1;
-        values = image.values.array();
     }
     
     private int locAtPos(int[] pos) {
@@ -72,27 +74,30 @@ public class ImageRegionIterator {
         return ret;
     }
     
-    public int[] getIndex() {
+    public final int[] getIndex() {
         int[] ret = new int[dimensionality];
         System.arraycopy(cur, 0, ret, 0, dimensionality);
         return ret;
     }
     
-    public byte[] get() {
-        byte[] ret = new byte[image.dataType.numBytes];
-        System.arraycopy(values, curLoc, ret, 0, ret.length);
-        return ret;
+    public final ByteBuffer get() {
+        return (ByteBuffer) values.slice()
+                .asReadOnlyBuffer()
+                .limit(image.dataType.numBytes);
     }
     
-    public void set(byte[] b) {
-        System.arraycopy(b, 0, values, curLoc, image.dataType.numBytes);
+    public final void set(ByteBuffer buffer) {
+        values.mark();
+        values.put((ByteBuffer) buffer.rewind().limit(image.dataType.numBytes));
+        values.reset();
     }
     
-    public boolean hasNext() {
+    public final boolean hasNext() {
         return curDim >= 0;
     }
     
-    public void next() {
+    public final void next() {
+        int curLoc = values.position();
         while(curDim >= 0) {
             if (cur[curDim] < max[curDim]) {
                 cur[curDim]++;
@@ -106,5 +111,7 @@ public class ImageRegionIterator {
                 curDim--;
             }
         }
+        
+        values.position(curLoc);
     }
 }

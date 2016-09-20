@@ -3,6 +3,7 @@ package nl.ramondevaan.visualization.image;
 import javafx.util.Pair;
 import nl.ramondevaan.visualization.data.DataType;
 import nl.ramondevaan.visualization.data.DataTypeFactory;
+import nl.ramondevaan.visualization.utilities.MetaImageUtilities;
 import org.apache.commons.io.FilenameUtils;
 
 import java.io.*;
@@ -32,6 +33,7 @@ public class MetaImageReader extends ImageReader {
     private int headerSize;
     private String dataFile;
     private List<Pair<String, String>> otherProperties;
+    private String dataTypeString;
     
     private InputStream stream;
     private DataTypeFactory factory;
@@ -97,12 +99,13 @@ public class MetaImageReader extends ImageReader {
             throw new IllegalArgumentException("TransformMatrix had incorrect dimensionality");
         }
         
-        if(dataType == null) {
+        if(dataTypeString == null) {
             throw new IllegalArgumentException("No element type set");
         }
         if(!byteOrderSet) {
             throw new IllegalArgumentException("No byte order set");
         }
+        dataType = factory.parseDataType(dataTypeString, byteOrder);
         
         if(!local) {
             if(dataFile == null) {
@@ -142,6 +145,7 @@ public class MetaImageReader extends ImageReader {
         headerSize = 0;
         dataFile = null;
         local = false;
+        dataTypeString = null;
         dataType = null;
 
         line = null;
@@ -176,65 +180,65 @@ public class MetaImageReader extends ImageReader {
 
     private boolean parseProperty() {
         switch(key) {
-            case "ObjectType":
-                if(!value.equalsIgnoreCase("Image")) {
+            case MetaImageUtilities.OBJECT_TYPE:
+                if(!value.equalsIgnoreCase(MetaImageUtilities.IMAGE)) {
                     throw new IllegalArgumentException("MHD did not contain an image");
                 }
                 break;
-            case "NDims":
+            case MetaImageUtilities.N_DIMS:
                 dimensionality = Integer.parseInt(value);
                 if(dimensionality <= 0) {
                     throw new IllegalArgumentException("Number of dimensions may not be smaller than 1");
                 }
                 break;
-            case "DimSize":
+            case MetaImageUtilities.DIM_SIZE:
                 parseDimSize(value);
                 break;
-            case "ElementSize":
+            case MetaImageUtilities.ELEMENT_SIZE:
                 parseElementSize(value);
                 break;
-            case "ElementSpacing":
+            case MetaImageUtilities.ELEMENT_SPACING:
                 parseElementSpacing(value);
                 break;
-            case "BinaryData":
+            case MetaImageUtilities.BINARY_DATA:
                 if(!Boolean.parseBoolean(value)) {
                     throw new UnsupportedOperationException("Currently, only binary data is supported");
                 }
                 break;
-            case "CompressedData":
+            case MetaImageUtilities.COMPRESSED_DATA:
                 if(Boolean.parseBoolean(value)) {
                     throw new UnsupportedOperationException("Compressed data is not (yet) supported");
                 }
                 break;
-            case "Offset":
+            case MetaImageUtilities.OFFSET:
                 parseOffset(value);
                 break;
-            case "ElementType":
-                dataType = factory.parseDataType(value);
+            case MetaImageUtilities.ELEMENT_TYPE:
+                dataTypeString = value;
                 break;
-            case "TransformMatrix":
+            case MetaImageUtilities.TRANSFORM_MATRIX:
                 parseTransformMatrix(value);
                 break;
-            case "ElementNumberOfChannels":
+            case MetaImageUtilities.ELEMENT_NUMBER_OF_CHANNELS:
                 int i = Integer.parseInt(value);
                 if(i != 1) {
                     throw new IllegalArgumentException("Currently, only a value of 1 for ElementNumberOfChannels is supported");
                 }
                 addOtherProperty(key, value);
                 break;
-            case "HeaderSize":
+            case MetaImageUtilities.HEADER_SIZE:
                 headerSize = Integer.parseInt(value);
                 break;
-            case "ElementDataFile":
+            case MetaImageUtilities.ELEMENT_DATAFILE:
                 parseDataFile(value);
                 return false;
-            case "BinaryDataByteOrderMSB":
-            case "ElementByteOrderMSB":
+            case MetaImageUtilities.BINARYDATA_BYTEORDER_MSB:
+            case MetaImageUtilities.ELEMENT_BYTEORDER_MSB:
                 byteOrder = Boolean.parseBoolean(value) ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN;
                 byteOrderSet = true;
                 break;
-            case "CenterOfRotation":
-            case "AnatomicalOrientation":
+            case MetaImageUtilities.CENTER_OF_ROTATION:
+            case MetaImageUtilities.ANATOMICAL_ORIENTATION:
                 addOtherProperty(key, value);
                 break;
             default:
@@ -296,7 +300,7 @@ public class MetaImageReader extends ImageReader {
     private void parseDataFile(String value) {
         if(value.matches("LIST[\\s+\\d+D]")) {
             throw new UnsupportedOperationException("Lists of filenames is currently not supported");
-        } else if(value.matches("LOCAL")) {
+        } else if(value.matches(MetaImageUtilities.LOCAL)) {
             local = true;
             return;
         }
@@ -317,9 +321,9 @@ public class MetaImageReader extends ImageReader {
         for(int i = 0; i < dimensionality; i++) {
             num *= dimensions[i];
         }
+        num *= dataType.numBytes;
         
-        final int numBytes = dataType.numBytes;
-        bytes = ByteBuffer.allocate(numBytes * num).order(byteOrder);
+        bytes = ByteBuffer.allocate(num).order(byteOrder);
         byte[] internal = bytes.array();
         if(headerSize > 0) {
             if(headerSize != stream.skip(headerSize)) {

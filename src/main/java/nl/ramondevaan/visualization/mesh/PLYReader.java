@@ -1,9 +1,6 @@
 package nl.ramondevaan.visualization.mesh;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -28,7 +25,7 @@ public class PLYReader extends MeshReader {
     protected Mesh read() throws IOException {
         coordinatesSet = false;
         facesSet = false;
-        stream = new FileInputStream(file);
+        stream = new BufferedInputStream(new FileInputStream(file));
         line = null;
         
         readLine();
@@ -72,12 +69,17 @@ public class PLYReader extends MeshReader {
     
     private void readLine() throws IOException {
         line = "";
-        int c = stream.read();
-        while(c != -1 && c != LF) {
-            if(c != CR) {
-                line += ((char) c);
+        int curChar = stream.read();
+        while(curChar != -1 && curChar != LF && curChar != CR) {
+            line += ((char) curChar);
+            curChar = stream.read();
+        }
+        if(curChar == CR) {
+            stream.mark(1);
+            curChar = stream.read();
+            if(curChar != LF) {
+                stream.reset();
             }
-            c = stream.read();
         }
     }
     

@@ -1,9 +1,6 @@
 package nl.ramondevaan.visualization.mesh;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -15,7 +12,7 @@ public class PLYWriter extends MeshWriter {
     
     @Override
     protected void write() throws IOException {
-        stream = new FileOutputStream(file);
+        stream = new BufferedOutputStream(new FileOutputStream(file));
         
         if(mesh.dimensionality > AXES.length) {
             throw new UnsupportedOperationException("Cannot handle dimensionality > "
@@ -49,10 +46,11 @@ public class PLYWriter extends MeshWriter {
                         .array());
             }
         }
+        stream.close();
     }
     
     private void println(String s) throws IOException {
         stream.write(s.getBytes());
-        stream.write('\n');
+        stream.write(System.lineSeparator().getBytes());
     }
 }

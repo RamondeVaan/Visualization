@@ -68,15 +68,14 @@ public class Image {
             throw new IllegalArgumentException("Values were of incorrect length");
         }
         extent = new int[2 * dimensions.length];
-        for(int i = 0; i < dimensions.length; i++) {
-            extent[2 * i + 1] = dimensions[i] - 1;
-        }
         bounds = new double[extent.length];
-        int k;
+        int a1, a2;
         for(int i = 0; i < dimensions.length; i++) {
-            k = 2 * i;
-            bounds[k] = offset[i];
-            bounds[k + 1] = offset[i] + dimensions[i] * spacing[i];
+            a1 = 2 * i;
+            a2 = a1 + 1;
+            bounds[a1] = offset[i];
+            extent[a2] = dimensions[i] - 1;
+            bounds[a2] = offset[i] + dimensions[i] * spacing[i];
         }
         
         this.dataType = dataType.copy();
@@ -130,6 +129,24 @@ public class Image {
         this.extent = extent;
         this.bounds = bounds;
         this.extraProperties = Collections.emptyList();
+    }
+    
+    public final void setOffset(double[] offset) {
+        Validate.notNull(offset);
+        if(offset.length != dimensionality) {
+            throw new IllegalArgumentException("Offset needs to be of length equal to dimensionality");
+        }
+        System.arraycopy(offset, 0, this.offset, 0, dimensionality);
+        recomputeBounds();
+    }
+    
+    private void recomputeBounds() {
+        int a1;
+        for(int i = 0; i < dimensions.length; i++) {
+            a1 = 2 * i;
+            bounds[a1] = offset[i];
+            bounds[a1 + 1] = offset[i] + dimensions[i] * spacing[i];
+        }
     }
     
     public final DataType getDataType() {

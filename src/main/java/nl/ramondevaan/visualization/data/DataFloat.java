@@ -1,14 +1,15 @@
 package nl.ramondevaan.visualization.data;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class DataFloat extends DataType {
-    public DataFloat() {
-        super(ByteBuffer.allocate(4).putFloat(0f));
+    public DataFloat(ByteOrder byteOrder) {
+        super(ByteBuffer.allocate(4).order(byteOrder).putFloat(0f));
     }
     
     @Override
     public DataType copy() {
-        return new DataFloat();
+        return new DataFloat(zero.order());
     }
 }
