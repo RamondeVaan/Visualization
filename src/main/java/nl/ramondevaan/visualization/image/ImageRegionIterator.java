@@ -42,32 +42,34 @@ public class ImageRegionIterator {
         }
         System.arraycopy(min, 0, cur, 0, dimensionality);
         int num;
-        int k;
+        skip[0] = image.dataType.numBytes;
         for(int i = 0; i < dmin1; i++) {
             num = 1;
-            k = i + 1;
-            for(int j = i + 2; j < dimensionality; j++) {
+            for(int j = 0; j < i; j++) {
                 num *= image.dimensions[j];
             }
-            skip[i] = (min[k] + image.dimensions[k] - max[k] - 1) * num * image.dataType.numBytes;
+            System.out.println((min[i] + image.dimensions[i] - max[i] - 1));
+            skip[i + 1] = (min[i] + image.dimensions[i] - max[i] - 1) * num * image.dataType.numBytes;
         }
-        skip[dmin1] = image.dataType.numBytes;
+        System.out.println("MIN: " + Arrays.toString(min));
+        System.out.println("MAX: " + Arrays.toString(max));
+        System.out.println("PRESKIP: " + Arrays.toString(skip));
+        for(int i = 1; i < skip.length; i++) {
+            skip[i] += skip[i - 1];
+        }
         values = image.values;
         values.position(locAtPos(min));
-        curDim = dmin1;
+        curDim = 0;
+        System.out.println("DIME: " + Arrays.toString(image.dimensions));
+        System.out.println("REGI: " + Arrays.toString(region));
+        System.out.println("SKIP: " + Arrays.toString(skip));
     }
     
     private int locAtPos(int[] pos) {
         int ret = 0;
-        int num;
+        int num = 1;
         for(int i = 0; i < dimensionality; i++) {
-            if(pos[i] == 0) {
-                continue;
-            }
-            num = 1;
-            for(int j = i + 1; j < dimensionality; j++) {
-                num *= image.dimensions[j];
-            }
+            num *= image.dimensions[i];
             ret += num * pos[i];
         }
         ret *= image.dataType.numBytes;
@@ -93,25 +95,27 @@ public class ImageRegionIterator {
     }
     
     public final boolean hasNext() {
-        return curDim >= 0;
+        return curDim < dimensionality;
     }
     
     public final void next() {
         int curLoc = values.position();
-        while(curDim >= 0) {
+        while(true) {
             if (cur[curDim] < max[curDim]) {
                 cur[curDim]++;
-                for(;curDim < dmin1; curDim++) {
-                    curLoc += skip[curDim];
-                }
                 curLoc += skip[curDim];
+                curDim = 0;
                 break;
             } else {
                 cur[curDim] = min[curDim];
-                curDim--;
+                curDim++;
+            }
+            if(curDim >= dimensionality) {
+                return;
             }
         }
-        
+
+        System.out.println(curLoc);
         values.position(curLoc);
     }
 }
