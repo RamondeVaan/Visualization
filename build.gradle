@@ -1,12 +1,10 @@
 plugins {
     id 'java'
     id 'idea'
-    id 'application'
 }
 
 group 'nl.ramondevaan.visualization'
 version '1.0'
-mainClassName = 'nl.ramondevaan.visualization.core.Main'
 sourceCompatibility = 1.8
 
 repositories {

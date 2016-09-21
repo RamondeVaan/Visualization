@@ -1,7 +1,6 @@
 package nl.ramondevaan.visualization.image;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 
 public class ImageRegionIterator {
     private final int dimensionality;
@@ -48,29 +47,22 @@ public class ImageRegionIterator {
             for(int j = 0; j < i; j++) {
                 num *= image.dimensions[j];
             }
-            System.out.println((min[i] + image.dimensions[i] - max[i] - 1));
             skip[i + 1] = (min[i] + image.dimensions[i] - max[i] - 1) * num * image.dataType.numBytes;
         }
-        System.out.println("MIN: " + Arrays.toString(min));
-        System.out.println("MAX: " + Arrays.toString(max));
-        System.out.println("PRESKIP: " + Arrays.toString(skip));
         for(int i = 1; i < skip.length; i++) {
             skip[i] += skip[i - 1];
         }
         values = image.values;
         values.position(locAtPos(min));
         curDim = 0;
-        System.out.println("DIME: " + Arrays.toString(image.dimensions));
-        System.out.println("REGI: " + Arrays.toString(region));
-        System.out.println("SKIP: " + Arrays.toString(skip));
     }
     
     private int locAtPos(int[] pos) {
         int ret = 0;
         int num = 1;
         for(int i = 0; i < dimensionality; i++) {
-            num *= image.dimensions[i];
             ret += num * pos[i];
+            num *= image.dimensions[i];
         }
         ret *= image.dataType.numBytes;
         return ret;
@@ -91,6 +83,15 @@ public class ImageRegionIterator {
     public final void set(ByteBuffer buffer) {
         values.mark();
         values.put((ByteBuffer) buffer.rewind().limit(image.dataType.numBytes));
+        values.reset();
+    }
+    
+    public final void set(byte[] value) {
+        if(value.length != image.dataType.numBytes) {
+            throw new IllegalArgumentException("Byte length was incorrect");
+        }
+        values.mark();
+        values.put(value);
         values.reset();
     }
     
@@ -115,7 +116,6 @@ public class ImageRegionIterator {
             }
         }
 
-        System.out.println(curLoc);
         values.position(curLoc);
     }
 }
