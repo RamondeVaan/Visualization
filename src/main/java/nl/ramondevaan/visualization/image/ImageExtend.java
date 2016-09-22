@@ -23,6 +23,10 @@ public class ImageExtend {
         this.input = input;
     }
     
+    public final Image getOutput() {
+        return output;
+    }
+    
     public final void update() {
         Validate.notNull(extension);
         Validate.notNull(input);
