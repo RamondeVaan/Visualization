@@ -23,8 +23,7 @@ public class DataUtils {
                 ByteBuffer.allocateDirect(original.capacity()) :
                 ByteBuffer.allocate(original.capacity());
         final ByteBuffer readOnlyCopy = original.asReadOnlyBuffer();
-        
-        readOnlyCopy.flip();
+        readOnlyCopy.rewind();
         clone.put(readOnlyCopy);
         clone.order(original.order());
         
