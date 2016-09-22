@@ -9,7 +9,7 @@ public abstract class Metric {
     private long updated;
     private double value;
     
-    public Metric(String name, int numInputs) {
+    public Metric(String name) {
         this.name = name;
         changed = System.currentTimeMillis();
         updated = 0L;
@@ -19,7 +19,7 @@ public abstract class Metric {
         return name;
     }
     
-    protected final void setInput(ValueSource input) {
+    public final void setInput(ValueSource input) {
         this.input = input;
         changed();
     }
