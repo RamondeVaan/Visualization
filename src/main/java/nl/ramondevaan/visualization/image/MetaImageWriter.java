@@ -50,8 +50,9 @@ public class MetaImageWriter extends ImageWriter {
         if(!FilenameUtils.getExtension(path).equalsIgnoreCase("mhd")) {
             throw new IllegalArgumentException("Can currently only write mhd files");
         }
-        if(rawPath == null) {
-            rawPath = FilenameUtils.getBaseName(path) + ".raw";
+        String tmpRawPath = rawPath;
+        if(tmpRawPath == null) {
+            tmpRawPath = FilenameUtils.getBaseName(path) + ".raw";
         }
         stream = new BufferedOutputStream(new FileOutputStream(file));
         
@@ -74,12 +75,12 @@ public class MetaImageWriter extends ImageWriter {
         
         if(!local) {
             if(!hideElementDataFile) {
-                printProperty(MetaImageUtilities.ELEMENT_DATAFILE, rawPath);
+                printProperty(MetaImageUtilities.ELEMENT_DATAFILE, tmpRawPath);
             }
             stream.close();
     
             stream = new BufferedOutputStream(new FileOutputStream(
-                    FilenameUtils.concat(FilenameUtils.getFullPath(path), rawPath)));
+                    FilenameUtils.concat(FilenameUtils.getFullPath(path), tmpRawPath)));
         } else {
             printProperty(MetaImageUtilities.ELEMENT_DATAFILE, MetaImageUtilities.LOCAL);
         }
