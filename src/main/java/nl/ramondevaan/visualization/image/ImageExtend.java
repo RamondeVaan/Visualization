@@ -19,6 +19,10 @@ public class ImageExtend {
         this.extension = extension;
     }
     
+    public final void setInput(Image input) {
+        this.input = input;
+    }
+    
     public final void update() {
         Validate.notNull(extension);
         Validate.notNull(input);
