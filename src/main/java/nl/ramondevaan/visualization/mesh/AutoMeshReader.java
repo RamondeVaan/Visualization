@@ -10,7 +10,6 @@ public class AutoMeshReader extends MeshReader {
     
     private MeshReaderFactory factory;
     private MeshReader reader;
-    private boolean readerChanged;
     private String lastExt;
     
     public AutoMeshReader() {
@@ -29,25 +28,18 @@ public class AutoMeshReader extends MeshReader {
     
     @Override
     protected Mesh read() throws IOException {
-        if(pathChanged()) {
-            String ext = FilenameUtils.getExtension(path);
-            if(!ext.equals(lastExt)) {
-                reader = factory.getMeshReaderByExtensionImpl(ext);
-                readerChanged = true;
-            }
-            lastExt = ext;
+        String ext = FilenameUtils.getExtension(path);
+        if(!ext.equals(lastExt)) {
+            reader = factory.getMeshReaderByExtensionImpl(ext);
         }
+        lastExt = ext;
     
         if(reader == null) {
             throw new UnsupportedOperationException("No appropriate reader was found.");
         }
         
-        if(readerChanged || pathChanged) {
-            reader.path = path;
-            reader.file = file;
-        }
-        reader.pathChanged = pathChanged;
-        readerChanged = false;
+        reader.path = path;
+        reader.file = file;
         return reader.read();
     }
 }

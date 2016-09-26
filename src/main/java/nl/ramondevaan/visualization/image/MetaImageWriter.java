@@ -8,7 +8,6 @@ import org.apache.commons.io.FilenameUtils;
 
 import java.io.*;
 import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
 
 public class MetaImageWriter extends ImageWriter {
     private final static DataTypeFactory DEFAULT_FACTORY = new DataTypeFactory();
@@ -30,23 +29,28 @@ public class MetaImageWriter extends ImageWriter {
     
     public final void setLocal(boolean local) {
         this.local = local;
+        changed();
     }
     
     public final void setHideElementDataFile(boolean hideElementDataFile) {
         this.hideElementDataFile = hideElementDataFile;
+        changed();
     }
     
     public final void setFactory(DataTypeFactory factory) {
         this.factory = factory == null ?
                 DEFAULT_FACTORY : factory;
+        changed();
     }
     
     public final void setRawPath(String rawPath) {
         this.rawPath = rawPath;
+        changed();
     }
     
     @Override
     protected void write() throws IOException {
+        Image image = getInput(0);
         if(!FilenameUtils.getExtension(path).equalsIgnoreCase("mhd")) {
             throw new IllegalArgumentException("Can currently only write mhd files");
         }

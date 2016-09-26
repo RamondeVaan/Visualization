@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.FloatBuffer;
 
 public class OFFReader extends MeshReader {
     
@@ -24,27 +25,25 @@ public class OFFReader extends MeshReader {
             throw new IllegalArgumentException("OFF file did not contain headers.");
         }
         
-        int dimensionality = -1;
         String[] sizes = line.split("\\s+");
-        float[][] coordinates = new float[Integer.parseInt(sizes[0])][];
+        final int numberOfCoordinates = Integer.parseInt(sizes[0]);
+        FloatBuffer coordinates = FloatBuffer.allocate(numberOfCoordinates * 3);
         int[][] faces = new int[Integer.parseInt(sizes[1])][];
         
         String[] coords;
-        for(int i = 0; i < coordinates.length; i++) {
+        for(int i = 0; i < numberOfCoordinates; i++) {
             line = reader.readLine();
             if(line == null) {
                 reader.close();
                 throw new UnsupportedOperationException("OFF file was missing coordinates.");
             }
             coords = line.trim().split("\\s+");
-            if(coords.length > dimensionality) {
-                dimensionality = coords.length;
-                fixFormer(coordinates, i, dimensionality);
+            if(coords.length != 3) {
+                throw new IllegalArgumentException("Incorrect coordinate dimensionality");
             }
-            coordinates[i] = new float[dimensionality];
-            for(int j = 0; j < dimensionality; j++) {
-                coordinates[i][j] = Float.parseFloat(coords[j]);
-            }
+            coordinates.put(Float.parseFloat(coords[0]));
+            coordinates.put(Float.parseFloat(coords[1]));
+            coordinates.put(Float.parseFloat(coords[2]));
         }
         
         String[] inds;
@@ -69,16 +68,6 @@ public class OFFReader extends MeshReader {
         
         reader.close();
         
-        return new Mesh(dimensionality, coordinates, faces);
-    }
-    
-    private static void fixFormer(float[][] values, int before, int dimensionality) {
-        for(int i = 0; i < before; i++) {
-            if(values[i].length < dimensionality) {
-                float[] t = new float[dimensionality];
-                System.arraycopy(values[i], 0, t, 0, values[i].length);
-                values[i] = t;
-            }
-        }
+        return new Mesh(coordinates, numberOfCoordinates, faces);
     }
 }

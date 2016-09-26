@@ -1,39 +1,51 @@
 package nl.ramondevaan.visualization.image;
 
+import nl.ramondevaan.visualization.core.Filter;
+import nl.ramondevaan.visualization.core.Source;
 import nl.ramondevaan.visualization.data.DataType;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.Validate;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-public class ImageExtend {
-    private Image input;
-    private Image output;
+public class ImageExtend extends Filter<Image, Image> {
     private int[] extension;
     
     private int dimensionality;
     private int[] dimSizes;
     private byte[] fillValue;
     
+    public ImageExtend() {
+        super(1);
+    }
+    
     public final void setExtension(int[] extension) {
-        this.extension = extension;
+        if(!Arrays.equals(this.extension, extension)) {
+            this.extension = ArrayUtils.clone(extension);
+            changed();
+        }
     }
     
-    public final void setInput(Image input) {
-        this.input = input;
+    public final void setFillValue(byte[] fillValue) {
+        if(!Arrays.equals(this.fillValue, fillValue)) {
+            this.fillValue = ArrayUtils.clone(fillValue);
+            changed();
+        }
     }
     
-    public final Image getOutput() {
-        return output;
+    public final void setInput(Source<Image> input) {
+        setInput(0, input);
     }
     
-    public final void update() {
-        Validate.notNull(extension);
+    @Override
+    protected Image updateImpl() throws Exception {
+        Image input = getInput(0);
         Validate.notNull(input);
         
-        if(extension.length == 0 || Arrays.equals(new int[extension.length], extension)) {
-            output = input.copy();
-            return;
+        if(ArrayUtils.isEmpty(extension) ||
+                Arrays.equals(new int[extension.length], extension)) {
+            return input.copy();
         }
         if(fillValue == null) {
             fillValue = new byte[input.dataType.numBytes];
@@ -43,16 +55,14 @@ public class ImageExtend {
             throw new IllegalArgumentException("Fill byte length was incorrect");
         }
         
-        constructOutput();
-        setZeros();
-        setValues();
+        Image output = constructOutput(input);
+        setZeros(input, output);
+        setValues(input, output);
+        
+        return output;
     }
     
-    public final void setFillValue(byte[] fillValue) {
-        this.fillValue = fillValue;
-    }
-    
-    private void constructOutput() {
+    private Image constructOutput(Image input) {
         dimensionality = input.dimensionality;
         if(extension.length < dimensionality) {
             int[] t = new int[dimensionality];
@@ -98,12 +108,12 @@ public class ImageExtend {
             bounds[a2] = offset[i] + dimSizes[i] * spacing[i];
         }
     
-        output = new Image(dataType, dimensionality, dimSizes, spacing,
+        return new Image(dataType, dimensionality, dimSizes, spacing,
                 size, offset, transform, ByteBuffer.wrap(values), extent,
                 bounds, input.extraProperties);
     }
     
-    private void setZeros() {
+    private void setZeros(Image input, Image output) {
         int[] region = new int[input.extent.length];
         int a1, a2;
         for(int i = 0; i < dimensionality; i++) {
@@ -142,7 +152,7 @@ public class ImageExtend {
         }
     }
     
-    private void setValues() {
+    private void setValues(Image input, Image output) {
         int[] inRegion = new int[input.extent.length];
         int[] outRegion = new int[input.extent.length];
         int a1, a2;

@@ -11,7 +11,6 @@ public class AutoMeshWriter extends MeshWriter {
     private MeshWriterFactory factory;
     private MeshWriter writer;
     private String lastExt;
-    private boolean writerChanged;
     
     public AutoMeshWriter() {
         this.factory = DEFAULT_FACTORY;
@@ -29,11 +28,10 @@ public class AutoMeshWriter extends MeshWriter {
     
     @Override
     protected void write() throws IOException {
-        if(pathChanged()) {
+        if(pathChanged) {
             String ext = FilenameUtils.getExtension(path);
             if(!ext.equals(lastExt)) {
                 writer = factory.getMeshWriterByExtensionImpl(ext);
-                writerChanged = true;
             }
             lastExt = ext;
         }
@@ -42,13 +40,8 @@ public class AutoMeshWriter extends MeshWriter {
             throw new UnsupportedOperationException("No appropriate writer was found.");
         }
     
-        if(writerChanged || pathChanged) {
-            writer.path = path;
-            writer.file = file;
-        }
-        writer.mesh = mesh;
-        writer.pathChanged = pathChanged;
+        writer.path = path;
+        writer.file = file;
         writer.write();
-        writerChanged = false;
     }
 }

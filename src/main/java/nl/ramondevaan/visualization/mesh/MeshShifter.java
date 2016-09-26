@@ -1,65 +1,58 @@
 package nl.ramondevaan.visualization.mesh;
 
-public class MeshShifter {
+import nl.ramondevaan.visualization.core.Filter;
+import nl.ramondevaan.visualization.core.Source;
+import nl.ramondevaan.visualization.utilities.DataUtils;
+import org.apache.commons.lang3.ArrayUtils;
+
+import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
+import java.util.Arrays;
+
+public class MeshShifter extends Filter<Mesh, Mesh> {
     private float[] shift;
-    private Mesh input;
-    private Mesh output;
-    private boolean shiftChanged;
-    private boolean meshChanged;
     
-    public final void setMesh(Mesh mesh) {
-        input = mesh;
-        meshChanged = true;
+    public MeshShifter() {
+        super(1);
     }
     
-    private boolean modified() {
-        return meshChanged || shiftChanged;
+    public final void setMesh(Source<Mesh> mesh) {
+        setInput(0, mesh);
     }
     
     public final void setShift(float[] shift) {
-        this.shift = shift;
-        shiftChanged = true;
+        if(!Arrays.equals(this.shift, shift)) {
+            this.shift = ArrayUtils.clone(shift);
+            changed();
+        }
     }
     
-    public final Mesh getOutput() {
-        return output;
-    }
-    
-    public final void update() {
-        if(input == null) {
-            throw new UnsupportedOperationException("No mesh was provided");
-        }
-        if(shift == null) {
-            throw new UnsupportedOperationException("No shift was provided");
+    @Override
+    protected Mesh updateImpl() throws Exception {
+        Mesh input = getInput(0);
+        
+        if(ArrayUtils.isEmpty(shift) ||
+                Arrays.equals(new float[shift.length], shift)) {
+            return input.copy();
         }
         
-        if(!modified()) {
-            return;
+        FloatBuffer buf = input.coordinatesRead;
+        FloatBuffer coordinates = buf.isDirect() ?
+                ByteBuffer.allocateDirect(buf.capacity() * 4)
+                        .order(buf.order()).asFloatBuffer() :
+                ByteBuffer.allocate(buf.capacity() * 4)
+                        .order(buf.order()).asFloatBuffer();
+        buf.rewind();
+                
+        float[] actShift = Arrays.copyOf(shift, 3);
+        
+        while(buf.hasRemaining()) {
+            coordinates.put(buf.get() + actShift[0]);
+            coordinates.put(buf.get() + actShift[1]);
+            coordinates.put(buf.get() + actShift[2]);
         }
         
-        float[][] coordinates = input.getCoordinates();
-        float[][] newCoordinates = new float[coordinates.length][input.dimensionality];
-    
-        int j;
-        for(int i = 0; i < coordinates.length; i++) {
-            for(j = 0; j < Math.min(input.dimensionality, shift.length); j++) {
-                newCoordinates[i][j] = coordinates[i][j] + shift[j];
-            }
-            for(; j < input.dimensionality; j++) {
-                newCoordinates[i][j] = coordinates[i][j];
-            }
-        }
-        
-        int[][] faces = input.faces;
-        int[][] newFaces = new int[faces.length][];
-        
-        for(int i = 0; i < faces.length; i++) {
-            newFaces[i] = new int[faces[i].length];
-            System.arraycopy(faces[i], 0, newFaces[i], 0, faces[i].length);
-        }
-    
-        output = new Mesh(input.dimensionality, newCoordinates, newFaces);
-        shiftChanged = false;
-        meshChanged = false;
+        return new Mesh(coordinates, input.numberOfCoordinates,
+                DataUtils.clone(input.faces), input.numberOfFaces);
     }
 }

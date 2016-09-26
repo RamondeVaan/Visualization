@@ -1,52 +1,41 @@
 package nl.ramondevaan.visualization.mesh;
 
+import nl.ramondevaan.visualization.core.Sink;
 import org.apache.commons.io.FilenameUtils;
 
 import java.io.File;
 import java.io.IOException;
 
-public abstract class MeshWriter {
+public abstract class MeshWriter extends Sink<Mesh> {
     private String lastPath;
     String path;
     File file;
-    Mesh mesh;
     boolean pathChanged;
     
+    public MeshWriter() {
+        super(1);
+    }
+    
     public final void setPath(String path) {
-        this.path = FilenameUtils.normalize(path);
-        pathChanged = !FilenameUtils
-                .equalsOnSystem(this.lastPath, this.path);
+        String p = FilenameUtils.normalize(path);
+        if(!FilenameUtils.equalsOnSystem(p, this.path)) {
+            this.path = p;
+            changed();
+            pathChanged = !FilenameUtils
+                    .equalsOnSystem(this.lastPath, this.path);
+        }
     }
     
-    public final void setMesh(Mesh mesh) {
-        this.mesh = mesh;
-    }
-    
-    protected final boolean pathChanged() {
-        return pathChanged;
-    }
-    
-    protected final String getPath() {
+    public final String getPath() {
         return path;
     }
     
-    protected final File getFile() {
+    public final File getFile() {
         return file;
     }
     
-    public final boolean modified() {
-        return pathChanged || modifiedExt();
-    }
-    
-    protected boolean modifiedExt() {
-        return false;
-    }
-    
-    public final void update() throws IOException {
-        if(!modified()) {
-            return;
-        }
-        if(mesh == null) {
+    protected final void updateImpl() throws IOException {
+        if(getInput(0) == null) {
             throw new UnsupportedOperationException("No mesh was provided");
         }
         if(path == null) {

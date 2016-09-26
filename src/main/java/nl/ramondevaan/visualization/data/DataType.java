@@ -14,7 +14,7 @@ public abstract class DataType {
             throw new IllegalArgumentException("Capacity must be at least 1");
         }
         this.numBytes = zero.capacity();
-        this.zero = DataUtils.cloneByteBuffer(zero).asReadOnlyBuffer();
+        this.zero = DataUtils.clone(zero).asReadOnlyBuffer();
     }
     
     public abstract DataType copy();

@@ -3,6 +3,8 @@ package nl.ramondevaan.visualization.mesh;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 
 public class PLYWriter extends MeshWriter {
     private final static String[] AXES = new String[] {
@@ -12,6 +14,7 @@ public class PLYWriter extends MeshWriter {
     
     @Override
     protected void write() throws IOException {
+        Mesh mesh = getInput(0);
         stream = new BufferedOutputStream(new FileOutputStream(file));
         
         if(mesh.dimensionality > AXES.length) {
@@ -21,31 +24,39 @@ public class PLYWriter extends MeshWriter {
         
         println("ply");
         println("format binary_big_endian 1.0");
-        println("element vertex " + mesh.coordinates.length);
+        println("element vertex " + mesh.numberOfCoordinates);
         for(int i = 0; i < mesh.dimensionality; i++) {
             println("property float " + AXES[i]);
         }
-        println("element face " + mesh.faces.length);
+        println("element face " + mesh.numberOfFaces);
         println("property list uchar int vertex_indices");
         println("end_header");
+    
+        FloatBuffer cBuf = mesh.coordinatesRead;
+        cBuf.rewind();
         
-        for(int i = 0; i < mesh.coordinates.length; i++) {
-            for(int j = 0; j < mesh.dimensionality; j++) {
+        while(cBuf.hasRemaining()) {
+            stream.write(ByteBuffer.allocate(4)
+                    .order(ByteOrder.BIG_ENDIAN)
+                    .putFloat(cBuf.get())
+                    .array());
+        }
+    
+        IntBuffer fBuf = mesh.facesRead;
+        fBuf.rewind();
+        
+        int n, i;
+        while(fBuf.hasRemaining()) {
+            n = fBuf.get();
+            stream.write(n);
+            for(i = 0; i < n; i++) {
                 stream.write(ByteBuffer.allocate(4)
                         .order(ByteOrder.BIG_ENDIAN)
-                        .putFloat(mesh.coordinates[i][j])
+                        .putInt(fBuf.get())
                         .array());
             }
         }
-        for(int i = 0; i < mesh.faces.length; i++) {
-            stream.write(mesh.faces[i].length);
-            for(int j = 0; j < mesh.faces[i].length; j++) {
-                stream.write(ByteBuffer.allocate(4)
-                        .order(ByteOrder.BIG_ENDIAN)
-                        .putInt(mesh.faces[i][j])
-                        .array());
-            }
-        }
+        
         stream.close();
     }
     

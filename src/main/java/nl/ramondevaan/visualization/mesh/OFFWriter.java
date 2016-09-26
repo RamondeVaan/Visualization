@@ -6,6 +6,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Locale;
@@ -13,30 +15,39 @@ import java.util.Locale;
 public class OFFWriter extends MeshWriter {
     @Override
     protected void write() throws FileNotFoundException {
+        Mesh mesh = getInput(0);
         PrintWriter pw = new PrintWriter(new FileOutputStream(file, false));
     
         pw.println("OFF");
-        pw.print(String.valueOf(mesh.coordinates.length));
+        pw.print(String.valueOf(mesh.numberOfCoordinates));
         pw.print(" ");
-        pw.print(String.valueOf(mesh.faces.length));
+        pw.print(String.valueOf(mesh.numberOfFaces));
         pw.println(" 0");
     
-        for(int i = 0; i < mesh.coordinates.length; i++) {
-            for(int j = 0; j < mesh.dimensionality; j++) {
-                pw.print(DataUtils.NUMBER_FORMAT.format(mesh.coordinates[i][j]));
-                pw.print(' ');
-            }
-            pw.println();
-        }
+        FloatBuffer cBuf = mesh.coordinatesRead;
+        cBuf.rewind();
         
-        for(int i = 0; i < mesh.faces.length; i++) {
-            pw.print(mesh.faces[i].length);
+        while(cBuf.hasRemaining()) {
+            pw.print(DataUtils.NUMBER_FORMAT.format(cBuf.get()));
             pw.print(' ');
-            for(int j = 0; j < mesh.faces[i].length; j++) {
-                pw.print(String.valueOf(mesh.faces[i][j]));
+            pw.print(DataUtils.NUMBER_FORMAT.format(cBuf.get()));
+            pw.print(' ');
+            pw.println(DataUtils.NUMBER_FORMAT.format(cBuf.get()));
+        }
+    
+        IntBuffer fBuf = mesh.facesRead;
+        fBuf.rewind();
+        
+        int n, i;
+        while(fBuf.hasRemaining()) {
+            n = fBuf.get();
+            pw.print(String.valueOf(n));
+            pw.print(' ');
+            for(i = 0; i < n - 1; i++) {
+                pw.print(String.valueOf(fBuf.get()));
                 pw.print(' ');
             }
-            pw.println();
+            pw.println(String.valueOf(fBuf.get()));
         }
     
         pw.close();

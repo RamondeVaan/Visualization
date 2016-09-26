@@ -11,7 +11,6 @@ public class AutoImageWriter extends ImageWriter {
     private ImageWriterFactory factory;
     private ImageWriter writer;
     private String lastExt;
-    private boolean writerChanged;
     
     public AutoImageWriter() {
         this.factory = DEFAULT_FACTORY;
@@ -29,11 +28,10 @@ public class AutoImageWriter extends ImageWriter {
     
     @Override
     protected void write() throws IOException {
-        if(pathChanged()) {
+        if(pathChanged) {
             String ext = FilenameUtils.getExtension(path);
             if(!ext.equals(lastExt)) {
                 writer = factory.getImageWriterByExtensionImpl(ext);
-                writerChanged = true;
             }
             lastExt = ext;
         }
@@ -42,13 +40,8 @@ public class AutoImageWriter extends ImageWriter {
             throw new UnsupportedOperationException("No appropriate writer was found.");
         }
         
-        if(writerChanged || pathChanged) {
-            writer.path = path;
-            writer.file = file;
-        }
-        writer.image = image;
-        writer.pathChanged = pathChanged;
+        writer.path = path;
+        writer.file = file;
         writer.write();
-        writerChanged = false;
     }
 }

@@ -1,41 +1,48 @@
 package nl.ramondevaan.visualization.image;
 
+import nl.ramondevaan.visualization.core.Filter;
+import nl.ramondevaan.visualization.core.Source;
 import nl.ramondevaan.visualization.data.DataType;
-import org.apache.commons.lang3.Validate;
+import org.apache.commons.lang3.ArrayUtils;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-public class ImageShift {
-    private Image input;
-    private Image output;
+public class ImageShift extends Filter<Image, Image> {
     private int[] shift;
     private byte[] fillValue;
     
     private int dimensionality;
     
-    public final void setInput(Image input) {
-        this.input = input;
+    public ImageShift() {
+        super(1);
+    }
+    
+    public final void setInput(Source<Image> input) {
+        setInput(0, input);
     }
     
     public final void setShift(int[] shift) {
-        this.shift = shift;
-    }
-    
-    public final Image getOutput() {
-        return output;
+        if(!Arrays.equals(this.shift, shift)) {
+            this.shift = ArrayUtils.clone(shift);
+            changed();
+        }
     }
     
     public final void setFillValue(byte[] fillValue) {
-        this.fillValue = fillValue;
+        if(!Arrays.equals(this.fillValue, fillValue)) {
+            this.fillValue = ArrayUtils.clone(fillValue);
+            changed();
+        }
     }
     
-    public final void update() {
-        Validate.notNull(shift);
-        Validate.notNull(input);
-        if(shift.length == 0 || Arrays.equals(new int[shift.length], shift)) {
-            output = input.copy();
-            return;
+    @Override
+    protected Image updateImpl() throws Exception {
+        Image input = getInput(0);
+        
+        if(ArrayUtils.isEmpty(shift) ||
+                Arrays.equals(new int[shift.length], shift)) {
+            return input.copy();
         }
         if(fillValue == null) {
             fillValue = new byte[input.dataType.numBytes];
@@ -45,12 +52,14 @@ public class ImageShift {
             throw new IllegalArgumentException("Fill byte length was incorrect");
         }
         
-        constructOutput();
-        setZeros();
-        setValues();
+        Image output = constructOutput(input);
+        setZeros(input, output);
+        setValues(input, output);
+        
+        return output;
     }
-    
-    private void constructOutput() {
+        
+        private Image constructOutput(Image input) {
         dimensionality = input.dimensionality;
         if(shift.length < dimensionality) {
             int[] t = new int[dimensionality];
@@ -83,12 +92,12 @@ public class ImageShift {
         double[] bounds = new double[input.bounds.length];
         System.arraycopy(input.bounds, 0, bounds, 0, bounds.length);
         
-        output = new Image(dataType, dimensionality, input.dimensions,
+        return new Image(dataType, dimensionality, input.dimensions,
                 spacing, size, offset, transform, ByteBuffer.wrap(values),
                 extent, bounds, input.extraProperties);
     }
     
-    private void setZeros() {
+    private void setZeros(Image input, Image output) {
         int[] region = new int[input.extent.length];
         int a1, a2;
         for(int i = 0; i < dimensionality; i++) {
@@ -127,7 +136,7 @@ public class ImageShift {
         }
     }
     
-    private void setValues() {
+    private void setValues(Image input, Image output) {
         int[] inRegion = new int[input.extent.length];
         int[] outRegion = new int[output.extent.length];
         

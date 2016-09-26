@@ -200,7 +200,7 @@ public class Image {
         double[] size = new double[dimensionality];
         double[] offset = new double[dimensionality];
         double[] transformMatrix = new double[this.transformMatrix.length];
-        ByteBuffer values = DataUtils.cloneByteBuffer(this.values);
+        ByteBuffer values = DataUtils.clone(this.values);
         int[] extent = new int[this.extent.length];
         double[] bounds = new double[this.bounds.length];
         

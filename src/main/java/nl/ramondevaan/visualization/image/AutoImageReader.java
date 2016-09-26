@@ -10,7 +10,6 @@ public class AutoImageReader extends ImageReader {
     
     private ImageReaderFactory factory;
     private ImageReader reader;
-    private boolean readerChanged;
     private String lastExt;
     
     public AutoImageReader() {
@@ -29,25 +28,18 @@ public class AutoImageReader extends ImageReader {
     
     @Override
     protected Image read() throws IOException {
-        if(pathChanged()) {
-            String ext = FilenameUtils.getExtension(path);
-            if(!ext.equals(lastExt)) {
-                reader = factory.getImageReaderByExtensionImpl(ext);
-                readerChanged = true;
-            }
-            lastExt = ext;
+        String ext = FilenameUtils.getExtension(path);
+        if(!ext.equals(lastExt)) {
+            reader = factory.getImageReaderByExtensionImpl(ext);
         }
+        lastExt = ext;
         
         if(reader == null) {
             throw new UnsupportedOperationException("No appropriate reader was found.");
         }
         
-        if(readerChanged || pathChanged) {
-            reader.path = path;
-            reader.file = file;
-        }
-        reader.pathChanged = pathChanged;
-        readerChanged = false;
+        reader.path = path;
+        reader.file = file;
         return reader.read();
     }
 }

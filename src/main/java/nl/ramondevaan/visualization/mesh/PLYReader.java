@@ -59,8 +59,13 @@ public class PLYReader extends MeshReader {
             throw new IllegalArgumentException("No face information given in header");
         }
     
-        readCoordinates();
-        readFaces();
+        if(format == DataFormat.ASCII) {
+            readCoordinatesASCII();
+            readFacesASCII();
+        } else {
+            readCoordinatesBinary();
+            readFacesBinary();
+        }
     
         stream.close();
         
@@ -169,14 +174,6 @@ public class PLYReader extends MeshReader {
         facesSet = true;
     }
     
-    private void readCoordinates() throws IOException {
-        if(format == DataFormat.ASCII) {
-            readCoordinatesASCII();
-        } else {
-            readCoordinatesBinary();
-        }
-    }
-    
     private void readCoordinatesBinary() throws IOException {
         byte[] bytes = new byte[4];
     
@@ -204,14 +201,6 @@ public class PLYReader extends MeshReader {
             for(int j = 0; j < dimensionality; j++) {
                 coordinates[i][j] = Float.parseFloat(split[j]);
             }
-        }
-    }
-    
-    private void readFaces() throws IOException {
-        if(format == DataFormat.ASCII) {
-            readFacesASCII();
-        } else {
-            readFacesBinary();
         }
     }
     

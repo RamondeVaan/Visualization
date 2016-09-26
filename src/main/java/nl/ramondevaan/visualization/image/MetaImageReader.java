@@ -55,6 +55,7 @@ public class MetaImageReader extends ImageReader {
     public final void setFactory(DataTypeFactory factory) {
         this.factory = factory == null ?
                 DEFAULT_FACTORY : factory;
+        changed();
     }
     
     @Override
@@ -147,6 +148,7 @@ public class MetaImageReader extends ImageReader {
         local = false;
         dataTypeString = null;
         dataType = null;
+        bytes = null;
 
         line = null;
         key = null;
