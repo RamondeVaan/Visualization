@@ -40,7 +40,6 @@ public abstract class MeshWriter extends Sink<Mesh> {
     }
     
     protected final void updateImpl() throws IOException {
-        System.out.println("WRITER UPDATE");
         Mesh mesh = getInput(0);
         if(mesh == null) {
             throw new UnsupportedOperationException("No mesh was provided");

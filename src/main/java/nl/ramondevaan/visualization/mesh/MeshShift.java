@@ -29,7 +29,6 @@ public class MeshShift extends Filter<Mesh, Mesh> {
     
     @Override
     protected Mesh updateImpl() throws Exception {
-        System.out.println("UPDATE SHIFT");
         Mesh input = getInput(0);
         
         if(ArrayUtils.isEmpty(shift) ||
@@ -52,8 +51,6 @@ public class MeshShift extends Filter<Mesh, Mesh> {
             coordinates.put(buf.get() + actShift[1]);
             coordinates.put(buf.get() + actShift[2]);
         }
-
-        System.out.println("RETURN SHIFT");
 
         return new Mesh(coordinates, input.numberOfCoordinates,
                 DataUtils.clone(input.faces), input.numberOfFaces);

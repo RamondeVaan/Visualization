@@ -34,7 +34,7 @@ public abstract class Filter<S, T> extends Source<T> {
         boolean b = false;
         for(Source<S> s : inputs) {
             if(s != null) {
-                b = b || s.update();
+                b = s.update() || b;
             }
         }
         if(b || changed) {

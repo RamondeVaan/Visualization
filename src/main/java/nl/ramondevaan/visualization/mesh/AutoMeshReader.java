@@ -28,7 +28,6 @@ public class AutoMeshReader extends MeshReader {
     
     @Override
     protected Mesh read() throws IOException {
-        System.out.println("MESH READ");
         String ext = FilenameUtils.getExtension(path);
         if(!ext.equals(lastExt)) {
             reader = factory.getMeshReaderByExtensionImpl(ext);
@@ -42,7 +41,6 @@ public class AutoMeshReader extends MeshReader {
         reader.path = path;
         reader.file = file;
 
-        System.out.println("RETURN READ");
         return reader.read();
     }
 }

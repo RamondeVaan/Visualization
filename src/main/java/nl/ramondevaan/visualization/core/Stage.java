@@ -1,6 +1,7 @@
 package nl.ramondevaan.visualization.core;
 
 public abstract class Stage {
+    private boolean running;
     boolean changed;
     
     public Stage() {
@@ -12,8 +13,13 @@ public abstract class Stage {
     }
     
     public final boolean update() throws Exception {
+        if(running) {
+            throw new IllegalArgumentException("Component is already running");
+        }
+        running = true;
         boolean ret = updateBool();
         changed = false;
+        running = false;
         return ret;
     }
 
