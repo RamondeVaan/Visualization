@@ -16,7 +16,7 @@ public class MeshShifter extends Filter<Mesh, Mesh> {
         super(1);
     }
     
-    public final void setMesh(Source<Mesh> mesh) {
+    public final void setInput(Source<Mesh> mesh) {
         setInput(0, mesh);
     }
     
