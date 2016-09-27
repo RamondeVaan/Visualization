@@ -4,13 +4,9 @@ import java.io.IOException;
 import java.nio.DoubleBuffer;
 
 public class StdDev extends Metric {
-    public StdDev() {
-        super("Standard Deviation");
-    }
-
     @Override
-    protected double computeValue() throws IOException {
-        DoubleBuffer values = getInput().getValues();
+    protected Double updateImpl() throws IOException {
+        DoubleBuffer values = getInput();
 
         if(values.limit() <= 0) {
             return Double.NaN;

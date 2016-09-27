@@ -13,8 +13,7 @@ public class PLYWriter extends MeshWriter {
     private OutputStream stream;
     
     @Override
-    protected void write() throws IOException {
-        Mesh mesh = getInput(0);
+    protected void write(Mesh mesh) throws IOException {
         stream = new BufferedOutputStream(new FileOutputStream(file));
         
         if(mesh.dimensionality > AXES.length) {

@@ -1,56 +1,57 @@
 package nl.ramondevaan.visualization.statistics;
 
+import nl.ramondevaan.visualization.core.Filter;
+import nl.ramondevaan.visualization.core.Source;
 import nl.ramondevaan.visualization.mesh.Mesh;
 import org.apache.commons.lang3.Validate;
 
 import java.io.IOException;
+import java.nio.DoubleBuffer;
+import java.nio.FloatBuffer;
 
-public class Euclidean extends ValueSource {
-    private Mesh mesh1;
-    private Mesh mesh2;
-    
+public class Euclidean extends Filter<Mesh, DoubleBuffer> {
     public Euclidean() {
-        super("Euclidean", 0);
+        super(2);
+    }
+
+    public final void setMesh1(Source<Mesh> mesh) {
+        setInput(0, mesh);
     }
     
-    public final void setMesh1(Mesh mesh1) {
-        this.mesh1 = mesh1;
-        changed();
+    public final void setMesh2(Source<Mesh> mesh) {
+        setInput(1, mesh);
     }
-    
-    public final void setMesh2(Mesh mesh2) {
-        this.mesh2 = mesh2;
-        changed();
-    }
-    
+
     @Override
-    protected double[] computeValues() throws IOException {
+    protected DoubleBuffer updateImpl() throws Exception {
+        Mesh mesh1 = getInput(0);
+        Mesh mesh2 = getInput(1);
+
         Validate.notNull(mesh1);
         Validate.notNull(mesh2);
-        
-        int dimensionality = mesh1.getDimensionality();
-        if(dimensionality != mesh2.getDimensionality()) {
-            throw new IllegalArgumentException("Meshes differed in dimensionality");
-        }
-        float[][] coords1 = mesh1.getCoordinates();
-        float[][] coords2 = mesh2.getCoordinates();
-        if(coords1.length != coords2.length) {
+
+        if(mesh1.numberOfCoordinates != mesh2.numberOfCoordinates) {
             throw new IllegalArgumentException("Meshes differed in number of points");
         }
+
+        FloatBuffer coords1 = mesh1.getCoordinates();
+        FloatBuffer coords2 = mesh2.getCoordinates();
+        coords1.rewind();
+        coords2.rewind();
     
-        double[] ret = new double[coords1.length];
+        DoubleBuffer ret = DoubleBuffer.allocate(mesh1.numberOfCoordinates);
         double sumsq;
     
-        for(int i = 0; i < coords1.length; i++) {
+        while(coords1.hasRemaining()) {
             sumsq = 0d;
         
-            for(int j = 0; j < dimensionality; j++) {
-                sumsq += Math.pow(coords1[i][j] - coords2[i][j], 2d);
+            for(int j = 0; j < 3; j++) {
+                sumsq += Math.pow(coords1.get() - coords2.get(), 2);
             }
         
-            ret[i] = Math.sqrt(sumsq);
+            ret.put(Math.sqrt(sumsq));
         }
     
-        return ret;
+        return ret.asReadOnlyBuffer();
     }
 }

@@ -4,13 +4,9 @@ import java.io.IOException;
 import java.nio.DoubleBuffer;
 
 public class Mean extends Metric {
-    public Mean() {
-        super("Mean");
-    }
-
     @Override
-    protected double computeValue() throws IOException {
-        DoubleBuffer values = getInput().getValues();
+    protected Double updateImpl() throws IOException {
+        DoubleBuffer values = getInput();
 
         if(values.limit() <= 0) {
             return Double.NaN;
@@ -19,7 +15,6 @@ public class Mean extends Metric {
         values.rewind();
 
         double sum = 0;
-
         while(values.hasRemaining()) {
             sum += values.get();
         }

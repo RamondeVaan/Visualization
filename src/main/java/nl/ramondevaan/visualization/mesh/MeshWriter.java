@@ -1,6 +1,7 @@
 package nl.ramondevaan.visualization.mesh;
 
 import nl.ramondevaan.visualization.core.Sink;
+import nl.ramondevaan.visualization.core.Source;
 import org.apache.commons.io.FilenameUtils;
 
 import java.io.File;
@@ -15,7 +16,11 @@ public abstract class MeshWriter extends Sink<Mesh> {
     public MeshWriter() {
         super(1);
     }
-    
+
+    public final void setInput(Source<Mesh> source) {
+        setInput(0, source);
+    }
+
     public final void setPath(String path) {
         String p = FilenameUtils.normalize(path);
         if(!FilenameUtils.equalsOnSystem(p, this.path)) {
@@ -35,7 +40,9 @@ public abstract class MeshWriter extends Sink<Mesh> {
     }
     
     protected final void updateImpl() throws IOException {
-        if(getInput(0) == null) {
+        System.out.println("WRITER UPDATE");
+        Mesh mesh = getInput(0);
+        if(mesh == null) {
             throw new UnsupportedOperationException("No mesh was provided");
         }
         if(path == null) {
@@ -43,10 +50,10 @@ public abstract class MeshWriter extends Sink<Mesh> {
         }
         file = new File(path);
         file.getParentFile().mkdirs();
-        write();
+        write(mesh);
         lastPath = path;
         pathChanged = false;
     }
     
-    protected abstract void write() throws IOException;
+    protected abstract void write(Mesh mesh) throws IOException;
 }

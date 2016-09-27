@@ -1,27 +1,21 @@
 package nl.ramondevaan.visualization.core;
 
 public abstract class Stage {
-    long changed;
-    long updated;
+    boolean changed;
     
     public Stage() {
-        changed = 0;
-        updated = 0;
+        this.changed = true;
     }
     
     protected final void changed() {
-        this.changed = System.currentTimeMillis();
+        this.changed = true;
     }
     
-    public final void update() throws Exception {
-        long c = maxChanged();
-        if(c > updated) {
-            update(c);
-            updated = System.currentTimeMillis();
-        }
+    public final boolean update() throws Exception {
+        boolean ret = updateBool();
+        changed = false;
+        return ret;
     }
-    
-    abstract void update(final long c) throws Exception;
-    
-    abstract long maxChanged();
+
+    abstract boolean updateBool() throws Exception;
 }

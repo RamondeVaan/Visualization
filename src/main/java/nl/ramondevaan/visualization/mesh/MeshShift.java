@@ -9,10 +9,10 @@ import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.Arrays;
 
-public class MeshShifter extends Filter<Mesh, Mesh> {
+public class MeshShift extends Filter<Mesh, Mesh> {
     private float[] shift;
     
-    public MeshShifter() {
+    public MeshShift() {
         super(1);
     }
     
@@ -29,6 +29,7 @@ public class MeshShifter extends Filter<Mesh, Mesh> {
     
     @Override
     protected Mesh updateImpl() throws Exception {
+        System.out.println("UPDATE SHIFT");
         Mesh input = getInput(0);
         
         if(ArrayUtils.isEmpty(shift) ||
@@ -51,7 +52,9 @@ public class MeshShifter extends Filter<Mesh, Mesh> {
             coordinates.put(buf.get() + actShift[1]);
             coordinates.put(buf.get() + actShift[2]);
         }
-        
+
+        System.out.println("RETURN SHIFT");
+
         return new Mesh(coordinates, input.numberOfCoordinates,
                 DataUtils.clone(input.faces), input.numberOfFaces);
     }

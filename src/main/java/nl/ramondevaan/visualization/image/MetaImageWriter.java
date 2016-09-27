@@ -49,8 +49,7 @@ public class MetaImageWriter extends ImageWriter {
     }
     
     @Override
-    protected void write() throws IOException {
-        Image image = getInput(0);
+    protected void write(Image image) throws IOException {
         if(!FilenameUtils.getExtension(path).equalsIgnoreCase("mhd")) {
             throw new IllegalArgumentException("Can currently only write mhd files");
         }

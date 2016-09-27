@@ -3,23 +3,23 @@ package nl.ramondevaan.visualization.mesh;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 
 public class PLYReader extends MeshReader {
-    private enum DataFormat {
-        ASCII, LITTLE_ENDIAN, BIG_ENDIAN;
-    }
-    
     private final static char LF = 10;
     private final static char CR = 13;
-    
+    private final static int dimensionality = 3;
+
     private boolean coordinatesSet;
     private boolean facesSet;
-    private float[][] coordinates;
+    private int numberOfCoordinates;
+    private ByteBuffer coordinates;
+    private FloatBuffer coordinatesFloat;
     private int[][] faces;
     private InputStream stream;
     private String line;
-    private DataFormat format;
-    private int dimensionality;
+    private boolean binary;
+    private ByteOrder byteOrder;
     
     @Override
     protected Mesh read() throws IOException {
@@ -59,7 +59,7 @@ public class PLYReader extends MeshReader {
             throw new IllegalArgumentException("No face information given in header");
         }
     
-        if(format == DataFormat.ASCII) {
+        if(!binary) {
             readCoordinatesASCII();
             readFacesASCII();
         } else {
@@ -69,7 +69,7 @@ public class PLYReader extends MeshReader {
     
         stream.close();
         
-        return new Mesh(dimensionality, coordinates, faces);
+        return new Mesh(coordinatesFloat, numberOfCoordinates, faces);
     }
     
     private void readLine() throws IOException {
@@ -92,13 +92,15 @@ public class PLYReader extends MeshReader {
         String f = line.replaceAll("\\s+", " ");
         switch(f) {
             case "format ascii 1.0":
-                format = DataFormat.ASCII;
+                binary = false;
                 break;
             case "format binary_little_endian 1.0":
-                format = DataFormat.LITTLE_ENDIAN;
+                binary = true;
+                byteOrder = ByteOrder.LITTLE_ENDIAN;
                 break;
             case "format binary_big_endian 1.0":
-                format = DataFormat.BIG_ENDIAN;
+                binary = true;
+                byteOrder = ByteOrder.BIG_ENDIAN;
                 break;
             default:
                 throw new IllegalArgumentException("Format \"" + f + "\" is not (yet) supported");
@@ -132,7 +134,7 @@ public class PLYReader extends MeshReader {
             throw new IllegalArgumentException("Could not find number of vertices in:" +
                     System.lineSeparator() + line);
         }
-        dimensionality = 0;
+       int dimensionality = 0;
         readLine();
         while(line != null) {
             line = line.trim();
@@ -149,7 +151,12 @@ public class PLYReader extends MeshReader {
             }
             readLine();
         }
-        coordinates = new float[Integer.parseInt(split[2])][dimensionality];
+        if(dimensionality != PLYReader.dimensionality) {
+            throw new UnsupportedOperationException("Only dimensionality of 3 is currently supported");
+        }
+        numberOfCoordinates = Integer.parseInt(split[2]);
+        coordinates = ByteBuffer.allocate(numberOfCoordinates * dimensionality * 4).order(byteOrder);
+        coordinatesFloat = coordinates.asFloatBuffer();
         coordinatesSet = true;
     }
     
@@ -175,32 +182,25 @@ public class PLYReader extends MeshReader {
     }
     
     private void readCoordinatesBinary() throws IOException {
-        byte[] bytes = new byte[4];
-    
-        for(int i = 0; i < coordinates.length; i++) {
-            for(int j = 0; j < dimensionality; j++) {
-                int num = stream.read(bytes, 0, 4);
-                if (num < 4) {
-                    throw new IOException("Error reading file binary data");
-                }
-                coordinates[i][j] = ByteBuffer.wrap(bytes).order(format == DataFormat.LITTLE_ENDIAN ?
-                        ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN).getFloat();
-            }
+        byte[] bytes = coordinates.array();
+        int k = stream.read(bytes, 0, bytes.length);
+        if(k < bytes.length) {
+            throw new IOException("Could not read required number of bytes");
         }
     }
     
     private void readCoordinatesASCII() throws IOException {
         String[] split;
-        for(int i = 0; i < coordinates.length; i++) {
+        for(int i = 0; i < numberOfCoordinates; i++) {
             readLine();
             split = line.split("\\s+");
             if(split.length != dimensionality) {
                 throw new IOException("File had incorrect format:"
                         + System.lineSeparator() + line);
             }
-            for(int j = 0; j < dimensionality; j++) {
-                coordinates[i][j] = Float.parseFloat(split[j]);
-            }
+            coordinates.putFloat(Float.parseFloat(split[0]));
+            coordinates.putFloat(Float.parseFloat(split[1]));
+            coordinates.putFloat(Float.parseFloat(split[2]));
         }
     }
     
@@ -228,7 +228,6 @@ public class PLYReader extends MeshReader {
         int num;
         byte[] vals = new byte[4];
         int read;
-        int numFac;
         
         for(int i = 0; i < faces.length; i++) {
             num = stream.read();
@@ -244,8 +243,7 @@ public class PLYReader extends MeshReader {
                     throw new IOException("Could not read specified number of bytes");
                 }
                 
-                faces[i][j] = ByteBuffer.wrap(vals).order(format == DataFormat.LITTLE_ENDIAN ?
-                        ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN).getInt();
+                faces[i][j] = ByteBuffer.wrap(vals).order(byteOrder).getInt();
             }
         }
     }

@@ -27,7 +27,7 @@ public class AutoImageWriter extends ImageWriter {
     }
     
     @Override
-    protected void write() throws IOException {
+    protected void write(Image image) throws IOException {
         if(pathChanged) {
             String ext = FilenameUtils.getExtension(path);
             if(!ext.equals(lastExt)) {
@@ -42,6 +42,6 @@ public class AutoImageWriter extends ImageWriter {
         
         writer.path = path;
         writer.file = file;
-        writer.write();
+        writer.write(image);
     }
 }

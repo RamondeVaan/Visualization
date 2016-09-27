@@ -28,25 +28,25 @@ public abstract class Filter<S, T> extends Source<T> {
         }
         changed();
     }
-    
+
     @Override
-    void update(final long c) throws Exception {
+    final boolean updateBool() throws Exception {
+        boolean b = false;
         for(Source<S> s : inputs) {
             if(s != null) {
-                s.update(c);
+                b = b || s.update();
             }
         }
-        updateImpl();
-    }
-    
-    @Override
-    long maxChanged() {
-        return Math.max(changed,
-                inputs.stream()
-                        .filter(tSource -> tSource != null)
-                        .mapToLong(Source::maxChanged)
-                        .max()
-                        .orElse(0)
-        );
+        if(b || changed) {
+            try {
+                output = updateImpl();
+                return true;
+            } catch (Exception e) {
+                output = null;
+                throw e;
+            }
+        }
+
+        return false;
     }
 }

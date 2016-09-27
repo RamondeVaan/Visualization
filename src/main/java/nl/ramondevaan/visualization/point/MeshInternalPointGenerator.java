@@ -4,6 +4,8 @@ import com.sun.javafx.geom.Vec3d;
 import nl.ramondevaan.visualization.mesh.Mesh;
 import org.apache.commons.lang3.Validate;
 
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.util.Arrays;
 
 public class MeshInternalPointGenerator extends PointGenerator {
@@ -11,12 +13,9 @@ public class MeshInternalPointGenerator extends PointGenerator {
     
     private Mesh mesh;
     private boolean meshChanged;
-    private int dimensionality;
-    private float[][] coordinates;
-    private int[][] faces;
     private float[] min;
     private float[] max;
-    private int numberOfPoints;
+    private Vec3d[][] triangles;
 
     public MeshInternalPointGenerator() {
         meshChanged = true;
@@ -25,61 +24,55 @@ public class MeshInternalPointGenerator extends PointGenerator {
     public final void setMesh(Mesh mesh) {
         this.mesh = mesh;
         meshChanged = true;
+        changed();
     }
     
     @Override
     protected void checkValidity() {
-        checkMesh();
-    }
-    
-    private void checkMesh() {
         if(meshChanged) {
             Validate.notNull(mesh);
-            this.dimensionality = mesh.getDimensionality();
-            this.coordinates = mesh.getCoordinates();
-            this.faces = mesh.getFaces();
-            if(dimensionality != 3) {
-                throw new UnsupportedOperationException(
-                        "Dimensionality other than 3 is currently not supported");
-            }
-            for(int[] f : faces) {
-                if(f.length != 3) {
-                    throw new UnsupportedOperationException(
+            triangles = new Vec3d[mesh.numberOfFaces][3];
+
+            FloatBuffer coordinates = mesh.getCoordinates();
+            IntBuffer faces = mesh.getFaces();
+
+            int i;
+            for(int f = 0; faces.hasRemaining(); f++) {
+                if(faces.get() != 3) {
+                    throw new IllegalArgumentException(
                             "Only triangular faces are currently supported");
                 }
+                for(i = 0; i < 3; i++) {
+                    coordinates.position(faces.get() * 3);
+                    triangles[f][i] = new Vec3d(
+                            coordinates.get(),
+                            coordinates.get(),
+                            coordinates.get()
+                    );
+                }
             }
-            computeBounds();
-        
+            computeBounds(coordinates);
+
             meshChanged = false;
         }
     }
     
     @Override
-    protected float[] generatePointImpl() {
-        float[] p = random();
-        while(!contains(p)) {
-            p = random();
+    protected void generatePointImpl(FloatBuffer buffer) {
+        while(!contains(buffer)) {
+            random(buffer);
         }
-        
-        return p;
     }
     
-    private boolean contains(float[] p) {
-        Vec3d origin = new Vec3d(p[0], p[1], p[2]);
+    private boolean contains(FloatBuffer buffer) {
+        buffer.rewind();
+        Vec3d origin = new Vec3d(buffer.get(),
+                buffer.get(), buffer.get());
         Vec3d dir = new Vec3d(0, 0, 1);
         
         int count = 0;
-        Vec3d[] polygon;
-        for(int[] face : faces) {
-            polygon = new Vec3d[face.length];
-            for(int i = 0; i < face.length; i++) {
-                polygon[i] = new Vec3d(
-                        coordinates[face[i]][0],
-                        coordinates[face[i]][1],
-                        coordinates[face[i]][2]
-                );
-            }
-            if(intersects(origin, dir, polygon)) {
+        for(Vec3d[] triangle : triangles) {
+            if(intersects(origin, dir, triangle)) {
                 count++;
             }
         }
@@ -87,7 +80,7 @@ public class MeshInternalPointGenerator extends PointGenerator {
         return count % 2 == 1;
     }
     
-    private boolean intersects(Vec3d o, Vec3d d, Vec3d[] p) {
+    private static boolean intersects(Vec3d o, Vec3d d, Vec3d[] p) {
         //Find vectors for two edges sharing V1
         Vec3d e1 = new Vec3d(p[1]);
         e1.sub(p[0]);
@@ -135,31 +128,42 @@ public class MeshInternalPointGenerator extends PointGenerator {
         return false;
     }
 
-    private void computeBounds() {
-        min = new float[dimensionality];
-        max = new float[dimensionality];
+    private void computeBounds(FloatBuffer coordinates) {
+        coordinates.rewind();
+
+        min = new float[3];
+        max = new float[3];
         
-        if(coordinates.length == 0) {
+        if(coordinates.limit() == 0) {
             Arrays.fill(min, Float.NaN);
             Arrays.fill(max, Float.NaN);
             return;
         }
-        
-        System.arraycopy(coordinates[0], 0, min, 0, dimensionality);
-        System.arraycopy(coordinates[0], 0, max, 0, dimensionality);
-        for(int i = 0; i < coordinates.length; i++) {
-            for(int j = 0; j < dimensionality; j++) {
-                min[j] = Math.min(min[j], coordinates[i][j]);
-                max[j] = Math.max(max[j], coordinates[i][j]);
-            }
+
+        min[0] = coordinates.get();
+        min[1] = coordinates.get();
+        min[2] = coordinates.get();
+        System.arraycopy(min, 0, max, 0, 3);
+        float x, y, z;
+        while(coordinates.hasRemaining()) {
+            x = coordinates.get();
+            y = coordinates.get();
+            z = coordinates.get();
+
+            min[0] = Math.min(min[0], x);
+            min[1] = Math.min(min[1], y);
+            min[2] = Math.min(min[2], z);
+
+            max[0] = Math.max(max[0], x);
+            max[1] = Math.max(max[1], y);
+            max[2] = Math.max(max[2], z);
         }
     }
     
-    private float[] random() {
-        float[] ret = new float[dimensionality];
-        for(int i = 0; i < dimensionality; i++) {
-            ret[i] = (float) (Math.random() * (max[i] - min[i]) + min[i]);
+    private void random(FloatBuffer buffer) {
+        buffer.rewind();
+        for(int i = 0; buffer.hasRemaining(); i++) {
+            buffer.put((float) (Math.random() * (max[i] - min[i]) + min[i]));
         }
-        return ret;
     }
 }

@@ -1,29 +1,23 @@
 package nl.ramondevaan.visualization.statistics;
 
-import java.io.IOException;
 import java.nio.DoubleBuffer;
 
 public class Minimum extends Metric {
-    public Minimum() {
-        super("Minimum");
-    }
-
     @Override
-    protected double computeValue() throws IOException {
-        DoubleBuffer values = getInput().getValues();
+    protected Double updateImpl() throws Exception {
+        DoubleBuffer b = getInput();
 
-        if(values.limit() <= 0) {
+        if(b.limit() <= 0) {
             return Double.NaN;
         }
 
-        values.rewind();
+        b.rewind();
 
-        double d = values.get();
-
-        while(values.hasRemaining()) {
-            d = Math.min(values.get(), d);
+        double min = b.get();
+        while(b.hasRemaining()) {
+            min = Math.min(min, b.get());
         }
 
-        return d;
+        return min;
     }
 }

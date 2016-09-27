@@ -2,8 +2,9 @@ package nl.ramondevaan.visualization.point;
 
 import org.apache.commons.lang3.Validate;
 
+import java.nio.FloatBuffer;
+
 public class RandomPointGenerator extends PointGenerator {
-    
     private float[] min;
     private float[] max;
     
@@ -32,15 +33,15 @@ public class RandomPointGenerator extends PointGenerator {
             min[i] = bounds[a1];
             max[i] = bounds[a2];
         }
+        changed();
     }
     
     @Override
-    protected float[] generatePointImpl() {
-        float[] ret = new float[min.length];
-        for(int i = 0; i < min.length; i++) {
-            ret[i] = (float) (Math.random() * (max[i] - min[i]) + min[i]);
+    protected void generatePointImpl(FloatBuffer buffer) {
+        buffer.rewind();
+        for(int i = 0; buffer.hasRemaining(); i++) {
+            buffer.put((float) (Math.random() * (max[i] - min[i]) + min[i]));
         }
-        return ret;
     }
     
     @Override

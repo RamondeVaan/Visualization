@@ -1,19 +1,16 @@
 package nl.ramondevaan.visualization.core;
 
 public abstract class Source<T> extends Stage {
-    long changed;
-    long updated;
-    private T output;
-    
-    public Source() {
-        changed = 0;
-        updated = -1;
-    }
+    T output;
     
     @Override
-    void update(long c) throws Exception {
+    boolean updateBool() throws Exception {
+        if(!this.changed) {
+            return false;
+        }
         try {
             output = updateImpl();
+            return true;
         } catch (Exception e) {
             output = null;
             throw e;
@@ -21,11 +18,6 @@ public abstract class Source<T> extends Stage {
     }
     
     protected abstract T updateImpl() throws Exception;
-    
-    @Override
-    long maxChanged() {
-        return changed;
-    }
     
     public final T getOutput() {
         return output;

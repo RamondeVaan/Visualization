@@ -14,8 +14,7 @@ import java.util.Locale;
 
 public class OFFWriter extends MeshWriter {
     @Override
-    protected void write() throws FileNotFoundException {
-        Mesh mesh = getInput(0);
+    protected void write(Mesh mesh) throws FileNotFoundException {
         PrintWriter pw = new PrintWriter(new FileOutputStream(file, false));
     
         pw.println("OFF");

@@ -1,6 +1,7 @@
 package nl.ramondevaan.visualization.image;
 
 import nl.ramondevaan.visualization.core.Sink;
+import nl.ramondevaan.visualization.core.Source;
 import org.apache.commons.io.FilenameUtils;
 
 import java.io.File;
@@ -15,7 +16,11 @@ public abstract class ImageWriter extends Sink<Image> {
     public ImageWriter() {
         super(1);
     }
-    
+
+    public final void setInput(Source<Image> source) {
+        setInput(0, source);
+    }
+
     public final void setPath(String path) {
         String p = FilenameUtils.normalize(path);
         if(!FilenameUtils.equalsOnSystem(p, this.path)) {
@@ -35,7 +40,8 @@ public abstract class ImageWriter extends Sink<Image> {
     }
     
     protected final void updateImpl() throws IOException {
-        if(getInput(0) == null) {
+        Image image = getInput(0);
+        if(image == null) {
             throw new UnsupportedOperationException("No image was provided");
         }
         if(path == null) {
@@ -43,10 +49,10 @@ public abstract class ImageWriter extends Sink<Image> {
         }
         file = new File(path);
         file.getParentFile().mkdirs();
-        write();
+        write(image);
         lastPath = path;
         pathChanged = false;
     }
     
-    protected abstract void write() throws IOException;
+    protected abstract void write(Image image) throws IOException;
 }

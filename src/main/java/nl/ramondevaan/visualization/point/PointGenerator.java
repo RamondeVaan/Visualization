@@ -1,27 +1,38 @@
 package nl.ramondevaan.visualization.point;
 
-public abstract class PointGenerator {
-    public final float[] generatePoint() {
-        checkValidity();
-        return generatePointImpl();
+import nl.ramondevaan.visualization.core.Source;
+
+import java.nio.FloatBuffer;
+
+public abstract class PointGenerator extends Source<FloatBuffer> {
+
+    private int numberOfPoints;
+
+    public PointGenerator() {
+        numberOfPoints = 1;
     }
-    
-    public float[][] generatePoints(int numberOfPoints) {
-        checkValidity();
-        if(numberOfPoints <= 0) {
-            return new float[0][];
+
+    public final void setNumberOfPoints(int i) {
+        if(i <= 0) {
+            throw new IllegalArgumentException("Must generate at least 1 point");
         }
-        
-        float[][] ret = new float[numberOfPoints][];
-        
+        this.numberOfPoints = i;
+        changed();
+    }
+
+    @Override
+    protected FloatBuffer updateImpl() throws Exception {
+        checkValidity();
+        FloatBuffer ret = FloatBuffer.allocate(numberOfPoints * 3);
         for(int i = 0; i < numberOfPoints; i++) {
-            ret[i] = generatePointImpl();
+            ret.position(i * 3);
+            ret.limit(ret.position() + 3);
+            generatePointImpl(ret.slice());
         }
-        
-        return ret;
+        return ret.asReadOnlyBuffer();
     }
     
-    protected abstract float[] generatePointImpl();
+    protected abstract void generatePointImpl(FloatBuffer buffer);
     
     protected void checkValidity() {
         //Do nothing

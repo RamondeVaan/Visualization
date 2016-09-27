@@ -31,25 +31,20 @@ public abstract class Sink<T> extends Stage {
     }
     
     @Override
-    void update(final long c) throws Exception {
+    final boolean updateBool() throws Exception {
+        boolean b = false;
         for(Source<T> s : inputs) {
             if(s != null) {
-                s.update(c);
+                b = b || s.update();
             }
         }
-        updateImpl();
+        if(b || changed) {
+            updateImpl();
+            return true;
+        }
+
+        return false;
     }
     
     protected abstract void updateImpl() throws Exception;
-    
-    @Override
-    long maxChanged() {
-        return Math.max(changed,
-                inputs.stream()
-                        .filter(tSource -> tSource != null)
-                        .mapToLong(Source::maxChanged)
-                        .max()
-                .orElse(0)
-        );
-    }
 }

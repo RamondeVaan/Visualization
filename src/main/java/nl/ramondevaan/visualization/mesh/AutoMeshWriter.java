@@ -27,7 +27,7 @@ public class AutoMeshWriter extends MeshWriter {
     }
     
     @Override
-    protected void write() throws IOException {
+    protected void write(Mesh mesh) throws IOException {
         if(pathChanged) {
             String ext = FilenameUtils.getExtension(path);
             if(!ext.equals(lastExt)) {
@@ -42,6 +42,6 @@ public class AutoMeshWriter extends MeshWriter {
     
         writer.path = path;
         writer.file = file;
-        writer.write();
+        writer.write(mesh);
     }
 }

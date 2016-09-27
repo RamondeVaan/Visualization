@@ -55,11 +55,11 @@ public class ImageShift extends Filter<Image, Image> {
         Image output = constructOutput(input);
         setZeros(input, output);
         setValues(input, output);
-        
+
         return output;
     }
         
-        private Image constructOutput(Image input) {
+    private Image constructOutput(Image input) {
         dimensionality = input.dimensionality;
         if(shift.length < dimensionality) {
             int[] t = new int[dimensionality];

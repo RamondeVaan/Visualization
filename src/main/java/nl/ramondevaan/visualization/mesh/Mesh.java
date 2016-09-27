@@ -16,7 +16,27 @@ public class Mesh {
     FloatBuffer coordinatesRead;
     IntBuffer faces;
     IntBuffer facesRead;
-    
+
+    public Mesh(int numberOfCoordinates, FloatBuffer coordinates, int[][] faces) {
+        Validate.notNull(coordinates);
+        Validate.notNull(faces);
+        if(numberOfCoordinates < 0) {
+            throw new IllegalArgumentException("Number of coordinates must be 0 or greater");
+        }
+        if(coordinates.limit() != numberOfCoordinates * 3) {
+            throw new IllegalArgumentException("Length of coordinates array was incorrect");
+        }
+
+        this.numberOfCoordinates = numberOfCoordinates;
+        this.numberOfFaces = faces.length;
+
+        this.coordinates = DataUtils.clone(coordinates);
+        this.coordinatesRead = this.coordinates.asReadOnlyBuffer();
+
+        this.faces = getFacesBuffer(faces);
+        this.facesRead = this.faces.asReadOnlyBuffer();
+    }
+
     public Mesh(float[] coordinates, int numberOfCoordinates, int[][] faces) {
         Validate.notNull(coordinates);
         Validate.notNull(faces);
@@ -30,17 +50,8 @@ public class Mesh {
         
         this.numberOfCoordinates = numberOfCoordinates;
         this.numberOfFaces = faces.length;
-        int n = 0;
-        for(int i = 0; i < faces.length; i++) {
-            n += faces[i].length + 1;
-        }
-        this.faces = IntBuffer.allocate(n);
-        for(int i = 0; i < faces.length; i++) {
-            this.faces.put(faces[i].length);
-            for(int j = 0; j < faces[i].length; j++) {
-                this.faces.put(faces[i][j]);
-            }
-        }
+
+        this.faces = getFacesBuffer(faces);
         this.facesRead = this.faces.asReadOnlyBuffer();
         
         float[] c = Arrays.copyOf(coordinates, numTimes3);
@@ -51,17 +62,7 @@ public class Mesh {
     Mesh(FloatBuffer coordinates, int numberOfCoordinates, int[][] faces) {
         this.numberOfCoordinates = numberOfCoordinates;
         this.numberOfFaces = faces.length;
-        int n = 0;
-        for(int i = 0; i < faces.length; i++) {
-            n += faces[i].length + 1;
-        }
-        this.faces = IntBuffer.allocate(n);
-        for(int i = 0; i < faces.length; i++) {
-            this.faces.put(faces[i].length);
-            for(int j = 0; j < faces[i].length; j++) {
-                this.faces.put(faces[i][j]);
-            }
-        }
+        this.faces = getFacesBuffer(faces);
         this.facesRead = this.faces.asReadOnlyBuffer();
         this.coordinates = coordinates;
         this.coordinatesRead = this.coordinates.asReadOnlyBuffer();
@@ -99,5 +100,20 @@ public class Mesh {
                 DataUtils.clone(faces),
                 this.numberOfFaces
         );
+    }
+
+    private static IntBuffer getFacesBuffer(int[][] faces) {
+        int n = 0;
+        for(int i = 0; i < faces.length; i++) {
+            n += faces[i].length + 1;
+        }
+        IntBuffer ret = IntBuffer.allocate(n);
+        for(int i = 0; i < faces.length; i++) {
+            ret.put(faces[i].length);
+            for(int j = 0; j < faces[i].length; j++) {
+                ret.put(faces[i][j]);
+            }
+        }
+        return ret;
     }
 }
