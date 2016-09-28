@@ -4,16 +4,15 @@ public abstract class Source<T> extends Stage {
     T output;
     
     @Override
-    boolean updateBool() throws Exception {
-        if(!this.changed) {
-            return false;
-        }
-        try {
-            output = updateImpl();
-            return true;
-        } catch (Exception e) {
-            output = null;
-            throw e;
+    void updateLongImpl() throws Exception {
+        if(updated - changed < 0) {
+            try {
+                output = updateImpl();
+                updated = System.nanoTime();
+            } catch (Exception e) {
+                output = null;
+                throw e;
+            }
         }
     }
     

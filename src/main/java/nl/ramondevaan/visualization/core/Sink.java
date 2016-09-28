@@ -43,19 +43,21 @@ public abstract class Sink<T> extends Stage {
     }
     
     @Override
-    final boolean updateBool() throws Exception {
-        boolean b = false;
+    final void updateLongImpl() throws Exception {
+        long maxUpdated = changed;
+        long t;
         for(Source<T> s : inputs) {
             if(s != null) {
-                b = b || s.update();
+                t = s.updateLong();
+                if(maxUpdated - t < 0) {
+                    maxUpdated = t;
+                }
             }
         }
-        if(b || changed) {
+        if(updated - maxUpdated < 0) {
             updateImpl();
-            return true;
+            updated = System.nanoTime();
         }
-
-        return false;
     }
     
     protected abstract void updateImpl() throws Exception;

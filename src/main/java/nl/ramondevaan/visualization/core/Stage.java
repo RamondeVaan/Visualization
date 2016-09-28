@@ -2,26 +2,33 @@ package nl.ramondevaan.visualization.core;
 
 public abstract class Stage {
     private boolean running;
-    boolean changed;
+    long changed;
+    long updated;
     
     public Stage() {
-        this.changed = true;
+        this.updated = System.nanoTime();
+        this.changed = System.nanoTime();
     }
     
     protected final void changed() {
-        this.changed = true;
+        this.changed = System.nanoTime();
     }
     
     public final boolean update() throws Exception {
+        long before = updated;
+        long after = updateLong();
+        return before - after < 0;
+    }
+    
+    final long updateLong() throws Exception {
         if(running) {
             throw new IllegalArgumentException("Component is already running");
         }
         running = true;
-        boolean ret = updateBool();
-        changed = false;
+        updateLongImpl();
         running = false;
-        return ret;
+        return updated;
     }
-
-    abstract boolean updateBool() throws Exception;
+    
+    abstract void updateLongImpl() throws Exception;
 }
