@@ -1,163 +1,100 @@
 package nl.ramondevaan.visualization.statistics;
 
-import javafx.util.Pair;
-
-import java.io.*;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.List;
-import java.util.Locale;
 
-public class CSVWriter {
+public class CSVWriter extends ValueMatrixWriter {
+    public static final String DEFAULT_COLSEP = ",";
+    public static final String DEFAULT_ROWSEP = System.lineSeparator();
+
     private String colSep;
     private String rowSep;
     private boolean quoted;
-    private File file;
-    private String[] headers;
-    private String[] values;
-    private boolean append;
     
     public CSVWriter() {
-        colSep = ",";
-        rowSep = System.lineSeparator();
+        colSep = DEFAULT_COLSEP;
+        rowSep = DEFAULT_ROWSEP;
         quoted = true;
-        headers = new String[0];
-        resetValues();
     }
-    
-    public final void setAppend(boolean append) {
-        this.append = append;
-    }
-    
-    public final void tryReadHeaders(File file, String[] backup) {
-        try(BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            String line = reader.readLine();
-            String[] headers = line.split(colSep);
-            
-            if(quoted) {
-                for(int i = 0; i < headers.length; i++) {
-                    if(headers[i].startsWith("\"")) {
-                        headers[i] = headers[i].substring(1);
-                    }
-                    if(headers[i].endsWith("\"")) {
-                        headers[i] = headers[i].substring(0, headers[i].length() - 1);
-                    }
-                }
-            }
-            
-            setHeaders(headers);
-        } catch (IOException e) {
-            setHeaders(backup);
-        }
-    }
-    
-    public final void setHeaders(String[] headers) {
-        if(headers == null) {
-            this.headers = new String[]{};
-            this.values = new String[]{};
-            return;
-        }
-        this.headers = new String[headers.length];
-        System.arraycopy(headers, 0, this.headers, 0, headers.length);
-        resetValues();
-    }
-    
-    public final void setValues(String[] values) {
-        if(values == null) {
-            resetValues();
-            return;
-        }
-        this.values = new String[headers.length];
-        System.arraycopy(values, 0, this.values, 0,
-                Math.min(this.values.length, values.length));
-    }
-    
-    public final void resetValues() {
-        this.values = new String[headers.length];
-        for(int i = 0; i < this.values.length; i++) {
-            this.values[i] = null;
-        }
-    }
-    
+
     public final void setColSep(String colSep) {
-        this.colSep = colSep;
+        this.colSep = colSep == null ?
+                DEFAULT_COLSEP : colSep;
     }
-    
+
     public final void setRowSep(String rowSep) {
-        this.rowSep = rowSep;
+        this.rowSep = rowSep == null ?
+                DEFAULT_ROWSEP : rowSep;
     }
-    
+
     public final void setQuoted(boolean quoted) {
         this.quoted = quoted;
     }
-    
-    public final void setPath(String path) {
-        if(path == null) {
-            this.file = null;
-            return;
-        }
-        this.file = new File(path);
-    }
-    
-    public final void setPath(File file) {
-        if(file == null) {
-            this.file = null;
-            return;
-        }
-        this.file = new File(file.getPath());
-    }
-    
-    public final void setValues(List<Pair<String, String>> metrics) {
-        resetValues();
-        
-        for(Pair<String, String> d : metrics) {
-            for(int i = 0; i < headers.length; i++) {
-                if(headers[i].equals(d.getKey())) {
-                    values[i] = d.getValue();
-                }
+
+    @Override
+    protected void write(ValueMatrix matrix) throws IOException {
+        try (PrintWriter writer = new PrintWriter(new FileOutputStream(file))) {
+            final int headerLength = matrix.headers.size();
+            final int numberOfRows = matrix.numberOfRows;
+
+            String[] headers;
+            String[] values;
+
+            if(quoted) {
+                headers = getQuoted(matrix.headers);
+                values = getQuoted(matrix.values);
+            } else {
+                headers = matrix.headers.toArray(new String[matrix.headers.size()]);
+                values = matrix.values.toArray(new String[matrix.values.size()]);
             }
-        }
-    }
-    
-    public final void writeFile() throws IOException {
-        if(file == null) {
-            throw new UnsupportedOperationException("No path was given");
-        }
-        if(headers == null || headers.length == 0) {
-            throw new UnsupportedOperationException("No metrics were given");
-        }
-        
-        final boolean exists = file.exists();
-        
-        try (PrintWriter writer = new PrintWriter(new FileOutputStream(file, append))){
-            final int len = headers.length;
-            final int redLen = len - 1;
-            
-            if(!append || !exists) {
-                for(int i = 0; i < len; i++) {
-                    writer.write(quoteFormat(headers[i]));
-                    if(i < redLen) {
-                        writer.write(colSep);
-                    }
-                }
-                writer.write(rowSep);
-            }
-            
-            for(int i = 0; i < len; i++) {
-                writer.write(quoteFormat(values[i] == null ? "" : values[i]));
-                if(i < redLen) {
+
+            if(headerLength > 0) {
+                int i;
+                for (i = 0; i < headerLength - 1; i++) {
+                    writer.write(headers[i]);
                     writer.write(colSep);
                 }
+                writer.write(headers[i]);
+
+                String s;
+                if(values.length > 0) {
+                    writer.write(rowSep);
+                    int k = 0;
+                    for (int j = 0; j < headerLength - 1; j++) {
+                        s = values[k++];
+                        writer.write(s == null ? "" : s);
+                        writer.write(colSep);
+                    }
+                    s = values[k++];
+                    writer.write(s == null ? "" : s);
+
+                    for (i = 1; i < numberOfRows; i++) {
+                        writer.write(rowSep);
+                        for (int j = 0; j < headerLength - 1; j++) {
+                            s = values[k++];
+                            writer.write(s == null ? "" : s);
+                            writer.write(colSep);
+                        }
+                        s = values[k++];
+                        writer.write(s == null ? "" : s);
+                    }
+                }
             }
-            writer.write(rowSep);
         }
     }
     
-    private String quoteFormat(String s) {
-        if(quoted) {
-            return "\"" + s + "\"";
+    private static String[] getQuoted(List<String> values) {
+        if(values == null) {
+            return new String[0];
         }
-        
-        return s;
+
+        String[] ret = new String[values.size()];
+        for(int i = 0; i < values.size(); i++) {
+            ret[i] = '"' + values.get(i) + '"';
+        }
+
+        return ret;
     }
 }

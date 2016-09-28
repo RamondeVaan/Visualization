@@ -1,5 +1,7 @@
 package nl.ramondevaan.visualization.core;
 
+import org.apache.commons.lang3.Validate;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,8 +16,9 @@ public abstract class Sink<T> extends Stage {
     public Sink(int numberOfInputs) {
         inputs = new ArrayList<>(numberOfInputs);
     }
-    
+
     protected final void setInput(int index, Source<T> input) {
+        Validate.notNull(input);
         if(index < inputs.size()) {
             inputs.set(index, input);
         } else if(index == inputs.size()) {
@@ -24,6 +27,15 @@ public abstract class Sink<T> extends Stage {
             throw new IndexOutOfBoundsException();
         }
         changed();
+    }
+
+    protected final void addInput(Source<T> input) {
+        Validate.notNull(input);
+        inputs.add(input);
+    }
+
+    protected final int getNumberOfInputs() {
+        return inputs.size();
     }
     
     protected final T getInput(int index) {

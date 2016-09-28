@@ -1,5 +1,7 @@
 package nl.ramondevaan.visualization.core;
 
+import org.apache.commons.lang3.Validate;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,6 +21,7 @@ public abstract class Filter<S, T> extends Source<T> {
     }
     
     protected final void setInput(int index, Source<S> input) {
+        Validate.notNull(input);
         if(index < inputs.size()) {
             inputs.set(index, input);
         } else if(index == inputs.size()) {
@@ -27,6 +30,15 @@ public abstract class Filter<S, T> extends Source<T> {
             throw new IndexOutOfBoundsException();
         }
         changed();
+    }
+
+    protected final void addInput(Source<S> input) {
+        Validate.notNull(input);
+        inputs.add(input);
+    }
+
+    protected final int getNumberOfInputs() {
+        return inputs.size();
     }
 
     @Override
