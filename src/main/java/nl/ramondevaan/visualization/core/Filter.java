@@ -20,7 +20,7 @@ public abstract class Filter<S, T> extends Source<T> {
         return inputs.get(index).getOutput();
     }
     
-    protected final void setInput(int index, Source<S> input) {
+    public final void setInput(int index, Source<S> input) {
         Validate.notNull(input);
         if(index < inputs.size()) {
             inputs.set(index, input);
@@ -31,13 +31,13 @@ public abstract class Filter<S, T> extends Source<T> {
         }
         changed();
     }
-
-    protected final void addInput(Source<S> input) {
+    
+    public final void addInput(Source<S> input) {
         Validate.notNull(input);
         inputs.add(input);
     }
-
-    protected final int getNumberOfInputs() {
+    
+    public final int getNumberOfInputs() {
         return inputs.size();
     }
 

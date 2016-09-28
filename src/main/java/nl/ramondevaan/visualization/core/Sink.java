@@ -17,7 +17,7 @@ public abstract class Sink<T> extends Stage {
         inputs = new ArrayList<>(numberOfInputs);
     }
 
-    protected final void setInput(int index, Source<T> input) {
+    public final void setInput(int index, Source<T> input) {
         Validate.notNull(input);
         if(index < inputs.size()) {
             inputs.set(index, input);
@@ -28,13 +28,13 @@ public abstract class Sink<T> extends Stage {
         }
         changed();
     }
-
-    protected final void addInput(Source<T> input) {
+    
+    public final void addInput(Source<T> input) {
         Validate.notNull(input);
         inputs.add(input);
     }
-
-    protected final int getNumberOfInputs() {
+    
+    public final int getNumberOfInputs() {
         return inputs.size();
     }
     
