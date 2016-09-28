@@ -22,15 +22,18 @@ public class CSVWriter extends ValueMatrixWriter {
     public final void setColSep(String colSep) {
         this.colSep = colSep == null ?
                 DEFAULT_COLSEP : colSep;
+        changed();
     }
 
     public final void setRowSep(String rowSep) {
         this.rowSep = rowSep == null ?
                 DEFAULT_ROWSEP : rowSep;
+        changed();
     }
 
     public final void setQuoted(boolean quoted) {
         this.quoted = quoted;
+        changed();
     }
 
     @Override

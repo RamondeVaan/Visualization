@@ -21,6 +21,7 @@ public class DoubleToValueMatrixFilter extends Filter<Double, ValueMatrix> {
     public final void setNumberFormat(DecimalFormat format) {
         this.format = format == null ?
                 DataUtils.NUMBER_FORMAT : format;
+        changed();
     }
 
     public final void addInput(String name, Source<Double> source) {
