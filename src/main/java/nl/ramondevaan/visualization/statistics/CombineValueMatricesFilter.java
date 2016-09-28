@@ -59,7 +59,6 @@ public class CombineValueMatricesFilter extends Filter<ValueMatrix, ValueMatrix>
         int i, l;
         for(i = 0; i < a.numberOfRows; i++) {
             for(l = 0; l < a.headers.size(); l++) {
-                System.out.println(a.values.get(j));
                 values[k++] = a.values.get(j++);
             }
             k += dif;
