@@ -17,6 +17,7 @@ public class MetaImageWriter extends ImageWriter {
     private DataTypeFactory factory;
     private boolean local;
     private boolean hideElementDataFile;
+    private boolean skipBinary;
     
     public MetaImageWriter() {
         factory = DEFAULT_FACTORY;
@@ -45,6 +46,11 @@ public class MetaImageWriter extends ImageWriter {
     
     public final void setRawPath(String rawPath) {
         this.rawPath = rawPath;
+        changed();
+    }
+    
+    public final void setSkipBinary(boolean skipBinary) {
+        this.skipBinary = skipBinary;
         changed();
     }
     
@@ -81,6 +87,10 @@ public class MetaImageWriter extends ImageWriter {
                 printProperty(MetaImageUtilities.ELEMENT_DATAFILE, tmpRawPath);
             }
             stream.close();
+            
+            if(skipBinary) {
+                return;
+            }
     
             stream = new BufferedOutputStream(new FileOutputStream(
                     FilenameUtils.concat(FilenameUtils.getFullPath(path), tmpRawPath)));
