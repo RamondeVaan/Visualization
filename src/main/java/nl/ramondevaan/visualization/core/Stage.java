@@ -10,7 +10,7 @@ public abstract class Stage {
         this.changed = System.nanoTime();
     }
     
-    protected final void changed() {
+    public final void changed() {
         this.changed = System.nanoTime();
     }
     
