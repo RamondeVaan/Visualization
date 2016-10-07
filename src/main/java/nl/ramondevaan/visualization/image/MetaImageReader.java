@@ -171,6 +171,12 @@ public class MetaImageReader extends ImageReader {
             }
         }
 
+        line = line.trim();
+        if(line.isEmpty()) {
+            key     = null;
+            value   = null;
+            return;
+        }
         String[] split = line.split("=");
         if(split.length != 2) {
             throw new IOException("Could not parse property from:"
@@ -181,70 +187,72 @@ public class MetaImageReader extends ImageReader {
     }
 
     private boolean parseProperty() {
-        switch(key) {
-            case MetaImageUtilities.OBJECT_TYPE:
-                if(!value.equalsIgnoreCase(MetaImageUtilities.IMAGE)) {
-                    throw new IllegalArgumentException("MHD did not contain an image");
-                }
-                break;
-            case MetaImageUtilities.N_DIMS:
-                dimensionality = Integer.parseInt(value);
-                if(dimensionality <= 0) {
-                    throw new IllegalArgumentException("Number of dimensions may not be smaller than 1");
-                }
-                break;
-            case MetaImageUtilities.DIM_SIZE:
-                parseDimSize(value);
-                break;
-            case MetaImageUtilities.ELEMENT_SIZE:
-                parseElementSize(value);
-                break;
-            case MetaImageUtilities.ELEMENT_SPACING:
-                parseElementSpacing(value);
-                break;
-            case MetaImageUtilities.BINARY_DATA:
-                if(!Boolean.parseBoolean(value)) {
-                    throw new UnsupportedOperationException("Currently, only binary data is supported");
-                }
-                break;
-            case MetaImageUtilities.COMPRESSED_DATA:
-                if(Boolean.parseBoolean(value)) {
-                    throw new UnsupportedOperationException("Compressed data is not (yet) supported");
-                }
-                break;
-            case MetaImageUtilities.OFFSET:
-                parseOffset(value);
-                break;
-            case MetaImageUtilities.ELEMENT_TYPE:
-                dataTypeString = value;
-                break;
-            case MetaImageUtilities.TRANSFORM_MATRIX:
-                parseTransformMatrix(value);
-                break;
-            case MetaImageUtilities.ELEMENT_NUMBER_OF_CHANNELS:
-                int i = Integer.parseInt(value);
-                if(i != 1) {
-                    throw new IllegalArgumentException("Currently, only a value of 1 for ElementNumberOfChannels is supported");
-                }
-                addOtherProperty(key, value);
-                break;
-            case MetaImageUtilities.HEADER_SIZE:
-                headerSize = Integer.parseInt(value);
-                break;
-            case MetaImageUtilities.ELEMENT_DATAFILE:
-                parseDataFile(value);
-                return false;
-            case MetaImageUtilities.BINARYDATA_BYTEORDER_MSB:
-            case MetaImageUtilities.ELEMENT_BYTEORDER_MSB:
-                byteOrder = Boolean.parseBoolean(value) ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN;
-                byteOrderSet = true;
-                break;
-            case MetaImageUtilities.CENTER_OF_ROTATION:
-            case MetaImageUtilities.ANATOMICAL_ORIENTATION:
-                addOtherProperty(key, value);
-                break;
-            default:
-                throw new UnsupportedOperationException("Unexpected key: \"" + key + "\"");
+        if(key != null) {
+            switch (key) {
+                case MetaImageUtilities.OBJECT_TYPE:
+                    if (!value.equalsIgnoreCase(MetaImageUtilities.IMAGE)) {
+                        throw new IllegalArgumentException("MHD did not contain an image");
+                    }
+                    break;
+                case MetaImageUtilities.N_DIMS:
+                    dimensionality = Integer.parseInt(value);
+                    if (dimensionality <= 0) {
+                        throw new IllegalArgumentException("Number of dimensions may not be smaller than 1");
+                    }
+                    break;
+                case MetaImageUtilities.DIM_SIZE:
+                    parseDimSize(value);
+                    break;
+                case MetaImageUtilities.ELEMENT_SIZE:
+                    parseElementSize(value);
+                    break;
+                case MetaImageUtilities.ELEMENT_SPACING:
+                    parseElementSpacing(value);
+                    break;
+                case MetaImageUtilities.BINARY_DATA:
+                    if (!Boolean.parseBoolean(value)) {
+                        throw new UnsupportedOperationException("Currently, only binary data is supported");
+                    }
+                    break;
+                case MetaImageUtilities.COMPRESSED_DATA:
+                    if (Boolean.parseBoolean(value)) {
+                        throw new UnsupportedOperationException("Compressed data is not (yet) supported");
+                    }
+                    break;
+                case MetaImageUtilities.OFFSET:
+                    parseOffset(value);
+                    break;
+                case MetaImageUtilities.ELEMENT_TYPE:
+                    dataTypeString = value;
+                    break;
+                case MetaImageUtilities.TRANSFORM_MATRIX:
+                    parseTransformMatrix(value);
+                    break;
+                case MetaImageUtilities.ELEMENT_NUMBER_OF_CHANNELS:
+                    int i = Integer.parseInt(value);
+                    if (i != 1) {
+                        throw new IllegalArgumentException("Currently, only a value of 1 for ElementNumberOfChannels is supported");
+                    }
+                    addOtherProperty(key, value);
+                    break;
+                case MetaImageUtilities.HEADER_SIZE:
+                    headerSize = Integer.parseInt(value);
+                    break;
+                case MetaImageUtilities.ELEMENT_DATAFILE:
+                    parseDataFile(value);
+                    return false;
+                case MetaImageUtilities.BINARYDATA_BYTEORDER_MSB:
+                case MetaImageUtilities.ELEMENT_BYTEORDER_MSB:
+                    byteOrder = Boolean.parseBoolean(value) ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN;
+                    byteOrderSet = true;
+                    break;
+                case MetaImageUtilities.CENTER_OF_ROTATION:
+                case MetaImageUtilities.ANATOMICAL_ORIENTATION:
+                    addOtherProperty(key, value);
+                    break;
+                default:
+                    throw new UnsupportedOperationException("Unexpected key: \"" + key + "\"");
+            }
         }
 
         return curChar != -1;
