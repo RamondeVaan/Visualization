@@ -43,7 +43,7 @@ public class MeshInternalPointGenerator extends PointGenerator {
                             "Only triangular faces are currently supported");
                 }
                 for(i = 0; i < 3; i++) {
-                    coordinates.position(faces.get() * 3);
+                    coordinates.position(f * 3);
                     triangles[f][i] = new Vec3d(
                             coordinates.get(),
                             coordinates.get(),
