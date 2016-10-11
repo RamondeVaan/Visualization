@@ -60,11 +60,12 @@ public class MeshInternalPointGenerator extends PointGenerator {
     
     @Override
     protected void generatePointImpl(FloatBuffer buffer) {
-        while(!contains(buffer)) {
+        do {
             random(buffer);
         }
+        while(!contains(buffer));
     }
-    
+
     private boolean contains(FloatBuffer buffer) {
         buffer.rewind();
         Vec3d origin = new Vec3d(buffer.get(),
