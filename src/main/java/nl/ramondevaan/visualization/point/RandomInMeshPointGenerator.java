@@ -8,7 +8,7 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
 
-public class MeshInternalPointGenerator extends PointGenerator {
+public class RandomInMeshPointGenerator extends RandomPointGenerator {
     private final static double EPSILON = 0.000001d;
     
     private Mesh mesh;
@@ -17,7 +17,7 @@ public class MeshInternalPointGenerator extends PointGenerator {
     private float[] max;
     private Vec3d[][] triangles;
 
-    public MeshInternalPointGenerator() {
+    public RandomInMeshPointGenerator() {
         meshChanged = true;
     }
 
@@ -28,7 +28,7 @@ public class MeshInternalPointGenerator extends PointGenerator {
     }
     
     @Override
-    protected void checkValidity() {
+    protected final void checkValidity() {
         if(meshChanged) {
             Validate.notNull(mesh);
             triangles = new Vec3d[mesh.numberOfFaces][3];
@@ -59,7 +59,7 @@ public class MeshInternalPointGenerator extends PointGenerator {
     }
     
     @Override
-    protected void generatePointImpl(FloatBuffer buffer) {
+    protected final void generatePoint(FloatBuffer buffer) {
         do {
             random(buffer);
         }
@@ -161,7 +161,7 @@ public class MeshInternalPointGenerator extends PointGenerator {
             max[2] = Math.max(max[2], z);
         }
     }
-    
+
     private void random(FloatBuffer buffer) {
         buffer.rewind();
         for(int i = 0; buffer.hasRemaining(); i++) {
