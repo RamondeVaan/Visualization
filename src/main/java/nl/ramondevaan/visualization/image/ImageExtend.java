@@ -3,33 +3,73 @@ package nl.ramondevaan.visualization.image;
 import nl.ramondevaan.visualization.core.Filter;
 import nl.ramondevaan.visualization.core.Source;
 import nl.ramondevaan.visualization.data.DataType;
+import nl.ramondevaan.visualization.utilities.DataUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.Validate;
 
 import java.nio.ByteBuffer;
+import java.nio.DoubleBuffer;
+import java.nio.IntBuffer;
+import java.nio.LongBuffer;
 import java.util.Arrays;
 
 public class ImageExtend extends Filter<Image, Image> {
-    private int[] extension;
-    
-    private int dimensionality;
-    private int[] dimSizes;
-    private byte[] fillValue;
+    private LongBuffer extension;
+    private ByteBuffer fillValue;
     
     public ImageExtend() {
         super(1);
     }
     
-    public final void setExtension(int[] extension) {
-        if(!Arrays.equals(this.extension, extension)) {
-            this.extension = ArrayUtils.clone(extension);
+    public final void setExtension(long[] extension) {
+        Validate.notNull(extension);
+        LongBuffer extensionTemp = LongBuffer.allocate(extension.length);
+        extensionTemp.put(extension);
+
+        extensionTemp.rewind();
+        this.extension.rewind();
+
+        if(!extensionTemp.equals(this.extension)) {
+            this.extension = extensionTemp;
+            changed();
+        }
+    }
+
+    public final void setExtension(LongBuffer extension) {
+        extension.rewind();
+        this.extension.rewind();
+        if(!extension.equals(this.extension)) {
+            this.extension = DataUtils.clone(extension);
             changed();
         }
     }
     
     public final void setFillValue(byte[] fillValue) {
-        if(!Arrays.equals(this.fillValue, fillValue)) {
-            this.fillValue = ArrayUtils.clone(fillValue);
+        if(fillValue == null) {
+            this.fillValue = null;
+            return;
+        }
+        ByteBuffer fillValueTemp = ByteBuffer.allocate(fillValue.length);
+        fillValueTemp.put(fillValue);
+
+        fillValueTemp.rewind();
+        this.fillValue.rewind();
+
+        if(!fillValueTemp.equals(this.fillValue)) {
+            this.fillValue = fillValueTemp;
+            changed();
+        }
+    }
+
+    public final void setFillValue(ByteBuffer fillValue) {
+        if(fillValue == null) {
+            this.fillValue = null;
+            return;
+        }
+        fillValue.rewind();
+        this.fillValue.rewind();
+        if(!fillValue.equals(this.fillValue)) {
+            this.fillValue = DataUtils.clone(fillValue);
             changed();
         }
     }
@@ -42,59 +82,58 @@ public class ImageExtend extends Filter<Image, Image> {
     protected Image updateImpl() throws Exception {
         Image input = getInput(0);
         Validate.notNull(input);
-        
-        if(ArrayUtils.isEmpty(extension) ||
-                Arrays.equals(new int[extension.length], extension)) {
+
+        if(extension == null || DataUtils.allZero(extension)) {
             return input.copy();
         }
+
+        ByteBuffer fillValueUsed;
+
         if(fillValue == null) {
-            fillValue = new byte[input.dataType.numBytes];
-            input.dataType.zero.rewind();
-            input.dataType.zero.get(fillValue);
-        } else if(fillValue.length != input.dataType.numBytes) {
+            fillValueUsed = DataUtils.clone(input.dataType.zero);
+        } else if(fillValue.limit() != input.dataType.numBytes) {
             throw new IllegalArgumentException("Fill byte length was incorrect");
         }
+
+        LongBuffer extensionUsed = LongBuffer.allocate(input.dimensionality);
+        extension.limit(input.dimensionality);
+        extension.rewind();
+        extensionUsed.put(extension);
+        extension.limit(extension.capacity());
         
-        Image output = constructOutput(input);
+        Image output = constructOutput(input, extensionUsed);
         setZeros(input, output);
         setValues(input, output);
         
         return output;
     }
     
-    private Image constructOutput(Image input) {
-        dimensionality = input.dimensionality;
-        if(extension.length < dimensionality) {
-            int[] t = new int[dimensionality];
-            System.arraycopy(extension, 0, t, 0, extension.length);
-            this.extension = t;
-        }
-        dimSizes = new int[input.dimensionality];
-        for(int i = 0; i < input.dimensionality; i++) {
-            dimSizes[i] = input.dimensions[i] + Math.abs(extension[i]);
+    private Image constructOutput(Image input, LongBuffer extensionUsed) {
+        int dimensionality = input.dimensionality;
+
+        input.dimensions.rewind();
+        LongBuffer dimSizes = LongBuffer.allocate(dimensionality);
+        while(dimSizes.hasRemaining()) {
+            dimSizes.put(input.dimensions.get() + Math.abs(extension.get()));
         }
         int numValues = 1;
-        for(int i = 0; i < dimensionality; i++) {
-            numValues *= dimSizes[i];
+        dimSizes.rewind();
+        while(dimSizes.hasRemaining()) {
+            numValues *= dimSizes.get();
         }
-        numValues *= input.dataType.numBytes;
-    
+        numValues *= input.dataType.numBytes * input.dataDimensionality;
+
+        DoubleBuffer origin = DataUtils.clone(input.origin);
+        ByteBuffer values   = ByteBuffer.allocate(numValues);
         DataType dataType = input.dataType.copy();
-        double[] spacing = new double[dimensionality];
-        double[] size = new double[dimensionality];
-        double[] offset = new double[dimensionality];
-        double[] transform = new double[input.transformMatrix.length];
-        byte[] values = new byte[numValues];
-    
-        System.arraycopy(input.spacing, 0, spacing, 0, dimensionality);
-        System.arraycopy(input.size, 0, size, 0, dimensionality);
-        System.arraycopy(input.offset, 0, offset, 0, dimensionality);
-        System.arraycopy(input.transformMatrix, 0, transform, 0, transform.length);
-    
-        for(int i = 0; i < dimensionality; i++) {
-            if(extension[i] < 0) {
-                offset[i] += extension[i] * spacing[i];
-            }
+
+        origin.rewind();
+        input.origin.rewind();
+        input.spacing.rewind();
+        extensionUsed.rewind();
+        while(extensionUsed.hasRemaining()) {
+            origin.put(input.origin.get() +
+                    extensionUsed.get() * input.spacing.get());
         }
     
         int[] extent = new int[input.extent.length];

@@ -94,4 +94,26 @@ public class DataUtils {
         
         return clone;
     }
+
+    public static boolean allZero(IntBuffer buffer) {
+        buffer.rewind();
+        while(buffer.hasRemaining()) {
+            if(buffer.get() != 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static boolean allZero(LongBuffer buffer) {
+        buffer.rewind();
+        while(buffer.hasRemaining()) {
+            if(buffer.get() != 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

@@ -1,40 +1,46 @@
 package nl.ramondevaan.visualization.image;
 
-import javafx.util.Pair;
 import nl.ramondevaan.visualization.data.DataType;
-import nl.ramondevaan.visualization.utilities.DataUtils;
-import org.apache.commons.lang3.Validate;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import java.nio.ByteBuffer;
+import java.nio.DoubleBuffer;
+import java.nio.LongBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 public class Image {
-    final DataType dataType;
-    final int dimensionality;
-    int[] dimensions;
-    double[] spacing;
-    double[] size;
-    double[] offset;
-    double[] transformMatrix;
-    ByteBuffer values;
-    final int[] extent;
-    final double[] bounds;
-    final List<Pair<String, String>> extraProperties;
+    final DataType                              dataType;
+    final int                                   dataDimensionality;
+    final int                                   dimensionality;
+    final LongBuffer                            dimensions;
+    final DoubleBuffer                          spacing;
+    final DoubleBuffer                          pixelSize;
+    final DoubleBuffer                          origin;
+    final DoubleBuffer                          transformMatrix;
+    final ByteBuffer                            values;
+    final LongBuffer                            extent;
+    final DoubleBuffer                          bounds;
+    final List<ImmutablePair<String, String>>   extraProperties;
 
-    public Image(DataType dataType, int dimensionality, int[] dimensions,
-                 double[] spacing, double[] size, double[] offset,
-                 double[] transformMatrix, byte[] values) {
-        this(dataType, dimensionality, dimensions, spacing, size,
-                offset, transformMatrix, values, new ArrayList<>());
+    public Image(DataType dataType, int dataDimensionality,     int dimensionality,
+                 int[] dimensions,  double[] spacing,           double[] pixelSize,
+                 double[] origin,   double[] transformMatrix,   byte[] values) {
+        this(dataType, dataDimensionality, dimensionality, dimensions, spacing,
+                pixelSize, origin, transformMatrix, values, new ArrayList<>());
     }
 
-    public Image(DataType dataType, int dimensionality, int[] dimensions,
-                 double[] spacing, double[] size, double[] offset,
-                 double[] transformMatrix, byte[] values, List<Pair<String, String>> extraProperties) {
+    public Image(DataType dataType, int dataDimensionality,     int dimensionality,
+                 int[] dimensions,  double[] spacing,           double[] pixelSize,
+                 double[] origin,   double[] transformMatrix,   byte[] values,
+                 List<ImmutablePair<String, String>> extraProperties) {
         if(dimensionality <= 0) {
             throw new IllegalArgumentException("Dimensionality must be at least 1");
+        }
+        if(dataDimensionality <= 0) {
+            throw new IllegalArgumentException("Data dimensionality must be at least 1");
         }
         if(dimensions.length != dimensionality) {
             throw new IllegalArgumentException("Given dimensions had incorrect dimensionality");
@@ -42,11 +48,11 @@ public class Image {
         if(spacing.length != dimensionality) {
             throw new IllegalArgumentException("Given spacing had incorrect dimensionality");
         }
-        if(size.length != dimensionality) {
-            throw new IllegalArgumentException("Given size had incorrect dimensionality");
+        if(pixelSize.length != dimensionality) {
+            throw new IllegalArgumentException("Given pixel size had incorrect dimensionality");
         }
-        if(offset.length != dimensionality) {
-            throw new IllegalArgumentException("Given offset had incorrect dimensionality");
+        if(origin.length != dimensionality) {
+            throw new IllegalArgumentException("Given origin had incorrect dimensionality");
         }
         if(transformMatrix.length != dimensionality * dimensionality) {
             throw new IllegalArgumentException("Given transform matrix had incorrect dimensionality");
@@ -59,160 +65,147 @@ public class Image {
             if(spacing[i] <= Double.MIN_VALUE) {
                 throw new IllegalArgumentException("Spacing must be larger than 0");
             }
-            if(size[i] <= Double.MIN_VALUE) {
+            if(pixelSize[i] <= Double.MIN_VALUE) {
                 throw new IllegalArgumentException("Size must be larger than 0");
             }
             num *= dimensions[i];
         }
-        if(values.length != dataType.numBytes * num) {
+        if(values.length != dataType.numBytes * num * dataDimensionality) {
             throw new IllegalArgumentException("Values were of incorrect length");
         }
-        extent = new int[2 * dimensions.length];
-        bounds = new double[extent.length];
-        int a1, a2;
-        for(int i = 0; i < dimensions.length; i++) {
-            a1 = 2 * i;
-            a2 = a1 + 1;
-            bounds[a1] = offset[i];
-            extent[a2] = dimensions[i] - 1;
-            bounds[a2] = offset[i] + dimensions[i] * spacing[i];
+        LongBuffer      extentTemp      = LongBuffer.allocate(2 * dimensionality);
+        DoubleBuffer    boundsTemp      = DoubleBuffer.allocate(extentTemp.capacity());
+        LongBuffer      dimensionsTemp  = LongBuffer.allocate(dimensionality);
+        DoubleBuffer    spacingTemp     = DoubleBuffer.allocate(dimensionality);
+        DoubleBuffer    sizeTemp        = DoubleBuffer.allocate(dimensionality);
+        DoubleBuffer    originTemp      = DoubleBuffer.allocate(dimensionality);
+        DoubleBuffer    tMatrixTemp     = DoubleBuffer.allocate(dimensionality * dataDimensionality);
+        ByteBuffer      valuesTemp      = ByteBuffer.allocate(values.length);
+        List<ImmutablePair<String, String>> extraProps = new ArrayList<>();
+
+        for(int i = 0; i < dimensionality; i++) {
+            boundsTemp.put(origin[i]);
+            boundsTemp.put(origin[i] + dimensions[i] * spacing[i]);
+            extentTemp.put(0);
+            extentTemp.put(dimensions[i] - 1);
+
+            dimensionsTemp  .put(dimensions[i]);
+            spacingTemp     .put(spacing[i]);
+            sizeTemp        .put(pixelSize[i]);
+            originTemp      .put(origin[i]);
         }
+        Arrays.stream(transformMatrix).forEach(tMatrixTemp::put);
+        for(int i = 0; i < values.length; i++) {
+            valuesTemp.put(values[i]);
+        }
+        extraProps.addAll(extraProperties);
+
+        extent  = extentTemp.asReadOnlyBuffer();
+        bounds  = boundsTemp.asReadOnlyBuffer();
+
+        this.dimensions         = dimensionsTemp.asReadOnlyBuffer();
+        this.spacing            = spacingTemp   .asReadOnlyBuffer();
+        this.pixelSize          = sizeTemp      .asReadOnlyBuffer();
+        this.origin             = originTemp    .asReadOnlyBuffer();
+        this.transformMatrix    = tMatrixTemp   .asReadOnlyBuffer();
+        this.values             = valuesTemp    .asReadOnlyBuffer();
         
-        this.dataType = dataType.copy();
-        this.dimensionality = dimensionality;
-        this.dimensions = new int[dimensionality];
-        this.spacing = new double[dimensionality];
-        this.size = new double[dimensionality];
-        this.offset = new double[dimensionality];
-        this.transformMatrix = new double[transformMatrix.length];
-        byte[] copy = new byte[values.length];
-        
-        System.arraycopy(dimensions, 0, this.dimensions, 0, dimensions.length);
-        System.arraycopy(spacing, 0, this.spacing, 0, spacing.length);
-        System.arraycopy(size, 0, this.size, 0, size.length);
-        System.arraycopy(offset, 0, this.offset, 0, offset.length);
-        System.arraycopy(transformMatrix, 0, this.transformMatrix, 0, transformMatrix.length);
-        System.arraycopy(values, 0, copy, 0, copy.length);
-        
-        this.values = ByteBuffer.wrap(copy);
-        this.extraProperties = Collections.unmodifiableList(extraProperties);
+        this.dataType           = dataType.copy();
+        this.dataDimensionality = dataDimensionality;
+        this.dimensionality     = dimensionality;
+        this.extraProperties    = Collections.unmodifiableList(extraProps);
     }
 
-    Image(DataType dataType, int dimensionality, int[] dimensions,
-          double[] spacing, double[] size, double[] offset,
-          double[] transformMatrix, ByteBuffer values, int[] extent,
-          double[] bounds, List<Pair<String, String>> extraProps) {
-        this.dataType = dataType;
-        this.dimensionality = dimensionality;
-        this.dimensions = dimensions;
-        this.spacing = spacing;
-        this.size = size;
-        this.offset = offset;
-        this.transformMatrix = transformMatrix;
-        this.values = values;
-        this.extent = extent;
-        this.bounds = bounds;
-        this.extraProperties = Collections.unmodifiableList(extraProps);
+    Image(DataType dataType, int dataDimensionality, int dimensionality,
+          LongBuffer dimensions, DoubleBuffer spacing, DoubleBuffer pixelSize,
+          DoubleBuffer origin, DoubleBuffer transformMatrix, ByteBuffer values,
+          LongBuffer extent, DoubleBuffer bounds,
+          List<ImmutablePair<String, String>> extraProps) {
+        this.dataType           = dataType;
+        this.dimensionality     = dimensionality;
+        this.dataDimensionality = dataDimensionality;
+        this.dimensions         = dimensions;
+        this.spacing            = spacing;
+        this.pixelSize          = pixelSize;
+        this.origin             = origin;
+        this.transformMatrix    = transformMatrix;
+        this.values             = values;
+        this.extent             = extent;
+        this.bounds             = bounds;
+        this.extraProperties    = extraProps;
     }
 
-    Image(DataType dataType, int dimensionality, int[] dimensions,
-          double[] spacing, double[] size, double[] offset,
-          double[] transformMatrix, ByteBuffer values, int[] extent, double[] bounds) {
-        this.dataType = dataType;
-        this.dimensionality = dimensionality;
-        this.dimensions = dimensions;
-        this.spacing = spacing;
-        this.size = size;
-        this.offset = offset;
-        this.transformMatrix = transformMatrix;
-        this.values = values;
-        this.extent = extent;
-        this.bounds = bounds;
-        this.extraProperties = Collections.emptyList();
+    Image(DataType dataType, int dataDimensionality, int dimensionality,
+          LongBuffer dimensions, DoubleBuffer spacing, DoubleBuffer pixelSize,
+          DoubleBuffer origin, DoubleBuffer transformMatrix, ByteBuffer values,
+          LongBuffer extent, DoubleBuffer bounds) {
+        this.dataType           = dataType;
+        this.dimensionality     = dimensionality;
+        this.dataDimensionality = dataDimensionality;
+        this.dimensions         = dimensions;
+        this.spacing            = spacing;
+        this.pixelSize          = pixelSize;
+        this.origin             = origin;
+        this.transformMatrix    = transformMatrix;
+        this.values             = values;
+        this.extent             = extent;
+        this.bounds             = bounds;
+        this.extraProperties    = Collections.emptyList();
     }
-    
-    public final void setOffset(double[] offset) {
-        Validate.notNull(offset);
-        if(offset.length != dimensionality) {
-            throw new IllegalArgumentException("Offset needs to be of length equal to dimensionality");
-        }
-        System.arraycopy(offset, 0, this.offset, 0, dimensionality);
-        recomputeBounds();
-    }
-    
-    private void recomputeBounds() {
-        int a1;
-        for(int i = 0; i < dimensions.length; i++) {
-            a1 = 2 * i;
-            bounds[a1] = offset[i];
-            bounds[a1 + 1] = offset[i] + dimensions[i] * spacing[i];
-        }
-    }
-    
+
     public final DataType getDataType() {
         return dataType;
     }
-    
+
+    public final int getDataDimensionality() {
+        return dataDimensionality;
+    }
+
     public final int getDimensionality() {
         return dimensionality;
     }
-    
-    public final int[] getDimensions() {
+
+    public final LongBuffer getDimensions() {
         return dimensions;
     }
-    
-    public final double[] getSpacing() {
+
+    public final DoubleBuffer getSpacing() {
         return spacing;
     }
-    
-    public final double[] getSize() {
-        return size;
+
+    public final DoubleBuffer getPixelSize() {
+        return pixelSize;
     }
-    
-    public final double[] getOffset() {
-        return offset;
+
+    public final DoubleBuffer getOrigin() {
+        return origin;
     }
-    
-    public final double[] getTransformMatrix() {
+
+    public final DoubleBuffer getTransformMatrix() {
         return transformMatrix;
     }
-    
+
     public final ByteBuffer getValues() {
         return values;
     }
-    
-    public final int[] getExtent() {
+
+    public final LongBuffer getExtent() {
         return extent;
     }
-    
-    public final double[] getBounds() {
+
+    public final DoubleBuffer getBounds() {
         return bounds;
     }
 
-    public final List<Pair<String, String>> getExtraProperties() {
+    public final List<ImmutablePair<String, String>> getExtraProperties() {
         return extraProperties;
     }
 
     public final Image copy() {
-        DataType dataType = this.dataType.copy();
-        int[] dimensions = new int[dimensionality];
-        double[] spacing = new double[dimensionality];
-        double[] size = new double[dimensionality];
-        double[] offset = new double[dimensionality];
-        double[] transformMatrix = new double[this.transformMatrix.length];
-        ByteBuffer values = DataUtils.clone(this.values);
-        int[] extent = new int[this.extent.length];
-        double[] bounds = new double[this.bounds.length];
-        
-        System.arraycopy(this.dimensions, 0, dimensions, 0, dimensionality);
-        System.arraycopy(this.spacing, 0, spacing, 0, dimensionality);
-        System.arraycopy(this.size, 0, size, 0, dimensionality);
-        System.arraycopy(this.offset, 0, offset, 0, dimensionality);
-        System.arraycopy(this.transformMatrix, 0, transformMatrix, 0, transformMatrix.length);
-        System.arraycopy(this.extent, 0, extent, 0, extent.length);
-        System.arraycopy(this.bounds, 0, bounds, 0, bounds.length);
-        
-        return new Image(dataType, dimensionality, dimensions, spacing,
-                size, offset, transformMatrix, values, extent, bounds, extraProperties);
+        return new Image(dataType.copy(), dataDimensionality, dimensionality,
+                dimensions.duplicate(), spacing.duplicate(), pixelSize.duplicate(),
+                origin.duplicate(), transformMatrix.duplicate(), values.duplicate(),
+                extent.duplicate(), bounds.duplicate(),
+                Collections.unmodifiableList(extraProperties));
     }
 }

@@ -1,23 +1,44 @@
 package nl.ramondevaan.visualization.image;
 
+import nl.ramondevaan.visualization.data.DataType;
+import org.apache.commons.lang3.Validate;
+
 import java.nio.ByteBuffer;
 
 public class ImageRegionIterator {
     private final int dimensionality;
     private final int dmin1;
-    private final Image image;
+    private final int dataLength;
     private final int[] min;
     private final int[] max;
     private final int[] cur;
     private final int[] skip;
     private final ByteBuffer values;
     private int curDim;
-    
+
+    public ImageRegionIterator(DataType dataType, int dataDimensionality,
+                               int[] dimensions, int[] region) {
+        Validate.notNull(dataType);
+        Validate.notNull(dimensions)
+        Validate.notNull(region);
+        if(dataDimensionality < 1) {
+            throw new IllegalArgumentException("Data dimensionality must be 1 or larger");
+        }
+        if(dimensions.length < 1) {
+            throw new IllegalArgumentException("Dimensionality must be 1 or larger");
+        }
+        if((dimensions.length * 2) != region.length) {
+            throw new IllegalArgumentException("Region dimensions were not compatible with given dimensions");
+        }
+        this.dimensionality = dimensions.length;
+        this.dmin1 = this.dimensionality - 1;
+        this.dataLength = dataType.numBytes * dataDimensionality;
+    }
+
     public ImageRegionIterator(Image image, int[] region) {
         this.dimensionality = image.dimensionality;
         this.dmin1 = this.dimensionality - 1;
-        this.image = image;
-        if(region.length != image.extent.length) {
+        if(region.length != image.extent.capacity()) {
             throw new IllegalArgumentException("Region dimensionality did not match image dimensionality");
         }
         this.min = new int[dimensionality];
@@ -35,7 +56,7 @@ public class ImageRegionIterator {
                 min[i] = region[a1];
                 max[i] = region[a2];
             }
-            if(min[i] < 0 || max[i] >= image.dimensions[i]) {
+            if(min[i] < 0 || max[i] >= image.dimensions.get(i)) {
                 throw new IllegalArgumentException("Region was out of bounds");
             }
         }
@@ -45,9 +66,9 @@ public class ImageRegionIterator {
         for(int i = 0; i < dmin1; i++) {
             num = 1;
             for(int j = 0; j < i; j++) {
-                num *= image.dimensions[j];
+                num *= image.dimensions.get(j);
             }
-            skip[i + 1] = (min[i] + image.dimensions[i] - max[i] - 1) * num * image.dataType.numBytes;
+            skip[i + 1] = (min[i] + image.dimensions.get(i) - max[i] - 1) * num * image.dataType.numBytes;
         }
         for(int i = 1; i < skip.length; i++) {
             skip[i] += skip[i - 1];
