@@ -9,7 +9,7 @@ public class MetaImageUtilities {
     public final static String ELEMENT_SPACING = "ElementSpacing";
     public final static String BINARY_DATA = "BinaryData";
     public final static String COMPRESSED_DATA = "CompressedData";
-    public final static String OFFSET = "Offset";
+    public final static String ORIGIN = "Offset";
     public final static String ELEMENT_TYPE = "ElementType";
     public final static String TRANSFORM_MATRIX = "TransformMatrix";
     public final static String ELEMENT_NUMBER_OF_CHANNELS = "ElementNumberOfChannels";

@@ -3,30 +3,20 @@ package nl.ramondevaan.visualization.image;
 import javafx.util.Pair;
 import nl.ramondevaan.visualization.data.DataTypeFactory;
 import nl.ramondevaan.visualization.utilities.DataUtils;
-import nl.ramondevaan.visualization.utilities.MetaImageUtilities;
+import static nl.ramondevaan.visualization.utilities.MetaImageUtilities.*;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import java.io.*;
-import java.nio.ByteOrder;
+import java.nio.*;
+import java.util.Iterator;
 
 public class MetaImageWriter extends ImageWriter {
-    private final static DataTypeFactory DEFAULT_FACTORY = new DataTypeFactory();
-    
     private OutputStream stream;
     private String rawPath;
-    private DataTypeFactory factory;
     private boolean local;
     private boolean hideElementDataFile;
     private boolean skipBinary;
-    
-    public MetaImageWriter() {
-        factory = DEFAULT_FACTORY;
-    }
-    
-    public MetaImageWriter(DataTypeFactory factory) {
-        this.factory = factory == null ?
-                DEFAULT_FACTORY : factory;
-    }
     
     public final void setLocal(boolean local) {
         this.local = local;
@@ -35,12 +25,6 @@ public class MetaImageWriter extends ImageWriter {
     
     public final void setHideElementDataFile(boolean hideElementDataFile) {
         this.hideElementDataFile = hideElementDataFile;
-        changed();
-    }
-    
-    public final void setFactory(DataTypeFactory factory) {
-        this.factory = factory == null ?
-                DEFAULT_FACTORY : factory;
         changed();
     }
     
@@ -65,26 +49,25 @@ public class MetaImageWriter extends ImageWriter {
         }
         stream = new BufferedOutputStream(new FileOutputStream(file));
         
-        printProperty(MetaImageUtilities.OBJECT_TYPE, MetaImageUtilities.IMAGE);
-        printProperty(MetaImageUtilities.N_DIMS, image.dimensionality);
-        printProperty(MetaImageUtilities.BINARY_DATA, true);
-        printProperty(MetaImageUtilities.BINARYDATA_BYTEORDER_MSB,
-                image.dataType.zero.order() == ByteOrder.BIG_ENDIAN);
-        printProperty(MetaImageUtilities.COMPRESSED_DATA, false);
-        printProperty(MetaImageUtilities.TRANSFORM_MATRIX, image.transformMatrix);
-        printProperty(MetaImageUtilities.OFFSET, image.offset);
-        for(Pair<String, String> p : image.extraProperties) {
+        printProperty(OBJECT_TYPE,                  IMAGE);
+        printProperty(N_DIMS,                       image.dimensionality);
+        printProperty(BINARY_DATA,                  true);
+        printProperty(BINARYDATA_BYTEORDER_MSB,     image.byteOrder == ByteOrder.BIG_ENDIAN);
+        printProperty(COMPRESSED_DATA,              false);
+        printProperty(TRANSFORM_MATRIX,             image.getTransformMatrix());
+        printProperty(ORIGIN,                       image.getOrigin());
+        for(ImmutablePair<String, String> p : image.extraProperties) {
             printProperty(p);
         }
-        printProperty(MetaImageUtilities.ELEMENT_SPACING, image.spacing);
-        printProperty(MetaImageUtilities.ELEMENT_SIZE, image.size);
-        printProperty(MetaImageUtilities.DIM_SIZE, image.dimensions);
-        printProperty(MetaImageUtilities.ELEMENT_TYPE,
-                factory.toTypeString(image.dataType));
+        printProperty(ELEMENT_SPACING,              image.getSpacing());
+        printProperty(ELEMENT_SIZE,                 image.getPixelSize());
+        printProperty(DIM_SIZE,                     image.getDimensions());
+        printProperty(ELEMENT_TYPE,                 image.componentType.name());
+        printProperty(ELEMENT_NUMBER_OF_CHANNELS,   image.dataDimensionality);
         
         if(!local) {
             if(!hideElementDataFile) {
-                printProperty(MetaImageUtilities.ELEMENT_DATAFILE, tmpRawPath);
+                printProperty(ELEMENT_DATAFILE, tmpRawPath);
             }
             stream.close();
             
@@ -95,40 +78,163 @@ public class MetaImageWriter extends ImageWriter {
             stream = new BufferedOutputStream(new FileOutputStream(
                     FilenameUtils.concat(FilenameUtils.getFullPath(path), tmpRawPath)));
         } else {
-            printProperty(MetaImageUtilities.ELEMENT_DATAFILE, MetaImageUtilities.LOCAL);
+            printProperty(ELEMENT_DATAFILE, LOCAL);
         }
         stream.write(image.values.array());
         stream.close();
     }
     
     private static String toString(double[] values) {
-        String s  = "";
-        for(double d : values) {
-            s += DataUtils.NUMBER_FORMAT.format(d);
-            s += " ";
-        }
-        return s.trim();
+        return String.join(" ", () -> new Iterator<CharSequence>() {
+            int i = 0;
+            
+            @Override
+            public boolean hasNext() {
+                return i < values.length;
+            }
+        
+            @Override
+            public CharSequence next() {
+                return DataUtils.NUMBER_FORMAT.format(values[i++]);
+            }
+        });
     }
     
     private static String toString(float[] values) {
-        String s  = "";
-        for(float f : values) {
-            s += DataUtils.NUMBER_FORMAT.format(f);
-            s += " ";
-        }
-        return s.trim();
+        return String.join(" ", () -> new Iterator<CharSequence>() {
+            int i = 0;
+        
+            @Override
+            public boolean hasNext() {
+                return i < values.length;
+            }
+        
+            @Override
+            public CharSequence next() {
+                return DataUtils.NUMBER_FORMAT.format(values[i++]);
+            }
+        });
+    }
+    
+    private static String toString(short[] values) {
+        return String.join(" ", () -> new Iterator<CharSequence>() {
+            int i = 0;
+            
+            @Override
+            public boolean hasNext() {
+                return i < values.length;
+            }
+            
+            @Override
+            public CharSequence next() {
+                return String.valueOf(values[i++]);
+            }
+        });
     }
     
     private static String toString(int[] values) {
-        String s  = "";
-        for(int i : values) {
-            s += String.valueOf(i);
-            s += " ";
-        }
-        return s.trim();
+        return String.join(" ", () -> new Iterator<CharSequence>() {
+            int i = 0;
+        
+            @Override
+            public boolean hasNext() {
+                return i < values.length;
+            }
+        
+            @Override
+            public CharSequence next() {
+                return String.valueOf(values[i++]);
+            }
+        });
     }
     
-    private void printProperty(Pair<String, String> p) throws IOException {
+    private static String toString(long[] values) {
+        return String.join(" ", () -> new Iterator<CharSequence>() {
+            int i = 0;
+            
+            @Override
+            public boolean hasNext() {
+                return i < values.length;
+            }
+            
+            @Override
+            public CharSequence next() {
+                return String.valueOf(values[i++]);
+            }
+        });
+    }
+    
+    private static String toString(DoubleBuffer buffer) {
+        return String.join(" ", () -> new Iterator<CharSequence>() {
+            @Override
+            public boolean hasNext() {
+                return buffer.hasRemaining();
+            }
+
+            @Override
+            public CharSequence next() {
+                return DataUtils.NUMBER_FORMAT.format(buffer.get());
+            }
+        });
+    }
+    
+    private static String toString(FloatBuffer buffer) {
+        return String.join(" ", () -> new Iterator<CharSequence>() {
+            @Override
+            public boolean hasNext() {
+                return buffer.hasRemaining();
+            }
+        
+            @Override
+            public CharSequence next() {
+                return DataUtils.NUMBER_FORMAT.format(buffer.get());
+            }
+        });
+    }
+    
+    private static String toString(ShortBuffer buffer) {
+        return String.join(" ", () -> new Iterator<CharSequence>() {
+            @Override
+            public boolean hasNext() {
+                return buffer.hasRemaining();
+            }
+            
+            @Override
+            public CharSequence next() {
+                return String.valueOf(buffer.get());
+            }
+        });
+    }
+    
+    private static String toString(IntBuffer buffer) {
+        return String.join(" ", () -> new Iterator<CharSequence>() {
+            @Override
+            public boolean hasNext() {
+                return buffer.hasRemaining();
+            }
+        
+            @Override
+            public CharSequence next() {
+                return String.valueOf(buffer.get());
+            }
+        });
+    }
+    
+    private static String toString(LongBuffer buffer) {
+        return String.join(" ", () -> new Iterator<CharSequence>() {
+            @Override
+            public boolean hasNext() {
+                return buffer.hasRemaining();
+            }
+            
+            @Override
+            public CharSequence next() {
+                return String.valueOf(buffer.get());
+            }
+        });
+    }
+    
+    private void printProperty(ImmutablePair<String, String> p) throws IOException {
         printProperty(p.getKey(), p.getValue());
     }
     
@@ -146,6 +252,26 @@ public class MetaImageWriter extends ImageWriter {
     
     private void printProperty(String key, int value) throws IOException {
         printProperty(key, String.valueOf(value));
+    }
+    
+    private void printProperty(String key, DoubleBuffer buffer) throws IOException {
+        printProperty(key, toString(buffer));
+    }
+    
+    private void printProperty(String key, FloatBuffer buffer) throws IOException {
+        printProperty(key, toString(buffer));
+    }
+    
+    private void printProperty(String key, ShortBuffer buffer) throws IOException {
+        printProperty(key, toString(buffer));
+    }
+    
+    private void printProperty(String key, IntBuffer buffer) throws IOException {
+        printProperty(key, toString(buffer));
+    }
+    
+    private void printProperty(String key, LongBuffer buffer) throws IOException {
+        printProperty(key, toString(buffer));
     }
     
     private void printProperty(String key, boolean value) throws IOException {

@@ -7,7 +7,7 @@ import java.nio.ByteBuffer;
 public abstract class DataType {
     
     public final int numBytes;
-    public final ByteBuffer zero;
+    private final ByteBuffer zero;
     
     protected DataType(ByteBuffer zero) {
         if(zero.capacity() <= 0) {
@@ -15,6 +15,10 @@ public abstract class DataType {
         }
         this.numBytes = zero.capacity();
         this.zero = DataUtils.clone(zero).asReadOnlyBuffer();
+    }
+    
+    public final ByteBuffer getZero() {
+        return zero.duplicate();
     }
     
     public abstract DataType copy();

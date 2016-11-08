@@ -1,61 +1,51 @@
 package nl.ramondevaan.visualization.image;
 
-import javafx.util.Pair;
-import nl.ramondevaan.visualization.data.DataType;
-import nl.ramondevaan.visualization.data.DataTypeFactory;
+import nl.ramondevaan.visualization.data.ComponentType;
+import nl.ramondevaan.visualization.data.PixelType;
+import nl.ramondevaan.visualization.utilities.DataUtils;
 import nl.ramondevaan.visualization.utilities.MetaImageUtilities;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.DoubleBuffer;
+import java.nio.LongBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
+import java.util.stream.DoubleStream;
+import java.util.stream.LongStream;
 
 public class MetaImageReader extends ImageReader {
-    private final static DataTypeFactory DEFAULT_FACTORY = new DataTypeFactory();
     private final static char LF = 10;
     private final static char CR = 13;
     
-    private int dimensionality;
-    private int[] dimensions;
-    private double[] spacing;
-    private double[] size;
-    private double[] offset;
-    private double[] transformMatrix;
-    private DataType dataType;
-    private ByteOrder byteOrder;
-    private ByteBuffer bytes;
-    private boolean local;
-    private boolean byteOrderSet;
-    private int headerSize;
-    private String dataFile;
-    private List<Pair<String, String>> otherProperties;
-    private String dataTypeString;
+    private int                                 dimensionality;
+    private int                                 numberOfChannels;
+    private LongBuffer                          dimensions;
+    private DoubleBuffer                        spacing;
+    private DoubleBuffer                        size;
+    private DoubleBuffer                        origin;
+    private DoubleBuffer                        transformMatrix;
+    private ComponentType                       componentType;
+    private PixelType                           pixelType;
+    private ByteOrder                           byteOrder;
+    private ByteBuffer                          bytes;
+    private boolean                             local;
+    private int                                 headerSize;
+    private String                              dataFile;
+    private List<ImmutablePair<String, String>> otherProperties;
     
     private InputStream stream;
-    private DataTypeFactory factory;
-    String line;
-    String key;
-    String value;
-    int curChar;
+    private String line;
+    private String key;
+    private String value;
+    private int curChar;
     
     public MetaImageReader() {
         otherProperties = new ArrayList<>();
-        factory = DEFAULT_FACTORY;
-    }
-    
-    public MetaImageReader(DataTypeFactory factory) {
-        this.factory = factory == null ?
-                DEFAULT_FACTORY : factory;
-    }
-    
-    public final void setFactory(DataTypeFactory factory) {
-        this.factory = factory == null ?
-                DEFAULT_FACTORY : factory;
-        changed();
     }
     
     @Override
@@ -71,42 +61,42 @@ public class MetaImageReader extends ImageReader {
         if(dimensions == null) {
             throw new IllegalArgumentException("Dimension sizes were missing");
         }
-        if(dimensions.length != dimensionality) {
+        if(dimensions.capacity() != dimensionality) {
             throw new IllegalArgumentException("Number of dimension sizes was not equal to dimensionality");
         }
         if(spacing == null && size == null) {
-            size = new double[dimensionality];
-            spacing = new double[dimensionality];
-            Arrays.fill(size, 1);
-            Arrays.fill(spacing, 1);
+            spacing = DoubleBuffer.allocate(dimensionality);
+            
+            while(spacing.hasRemaining()) {
+                spacing.put(1d);
+            }
+            
+            size = DataUtils.clone(spacing);
         } else if(spacing == null) {
-            spacing = new double[size.length];
-            System.arraycopy(size, 0, spacing, 0, size.length);
+            spacing = DataUtils.clone(size);
         } else if(size == null) {
-            size = new double[spacing.length];
-            System.arraycopy(spacing, 0, size, 0, spacing.length);
+            size = DataUtils.clone(spacing);
         }
     
-        if(size.length != dimensionality) {
+        if(size.capacity() != dimensionality) {
             throw new IllegalArgumentException("Size dimensionality was not equal to provided dimensionality");
         }
-        if(spacing.length != dimensionality) {
+        if(spacing.capacity() != dimensionality) {
             throw new IllegalArgumentException("Spacing dimensionality was not equal to provided dimensionality");
         }
-        if(offset != null && offset.length != dimensionality) {
-            throw new IllegalArgumentException("Offset dimensionality was not equal to provided dimensionality");
+        if(origin != null && origin.capacity() != dimensionality) {
+            throw new IllegalArgumentException("Origin dimensionality was not equal to provided dimensionality");
         }
-        if(transformMatrix != null && transformMatrix.length != (dimensionality * dimensionality)) {
+        if(transformMatrix != null && transformMatrix.capacity() != (dimensionality * dimensionality)) {
             throw new IllegalArgumentException("TransformMatrix had incorrect dimensionality");
         }
         
-        if(dataTypeString == null) {
+        if(componentType == null) {
             throw new IllegalArgumentException("No element type set");
         }
-        if(!byteOrderSet) {
+        if(byteOrder == null) {
             throw new IllegalArgumentException("No byte order set");
         }
-        dataType = factory.parseDataType(dataTypeString, byteOrder);
         
         if(!local) {
             if(dataFile == null) {
@@ -118,38 +108,65 @@ public class MetaImageReader extends ImageReader {
         readBinary();
         stream.close();
     
-        int[] extent = new int[2 * dimensions.length];
-        for(int i = 0; i < dimensions.length; i++) {
-            extent[2 * i + 1] = dimensions[i] - 1;
+        LongBuffer extent = LongBuffer.allocate(2 * dimensions.capacity());
+        dimensions.rewind();
+        while (dimensions.hasRemaining()) {
+            extent.put(0);
+            extent.put(dimensions.get());
         }
-        double[] bounds = new double[extent.length];
-        int k;
-        for(int i = 0; i < dimensions.length; i++) {
-            k = 2 * i;
-            bounds[k] = offset[i];
-            bounds[k + 1] = offset[i] + dimensions[i] * spacing[i];
+        DoubleBuffer bounds = DoubleBuffer.allocate(extent.capacity());
+        
+        origin.rewind();
+        dimensions.rewind();
+        spacing.rewind();
+        
+        double t;
+        double s;
+        while(bounds.hasRemaining()) {
+            s = spacing.get();
+            t = origin.get() - s;
+            bounds.put(t);
+            bounds.put(t + dimensions.get() * s);
         }
         
-        return new Image(dataType, dimensionality, dimensions, spacing, size,
-                offset, transformMatrix, bytes, extent, bounds, otherProperties);
+        pixelType = numberOfChannels == 1 ?
+                PixelType.SCALAR :
+                PixelType.VECTOR;
+        
+        return new Image(
+                componentType,
+                pixelType,
+                byteOrder,
+                numberOfChannels,
+                dimensions,
+                spacing,
+                size,
+                origin,
+                transformMatrix,
+                bytes,
+                extent,
+                bounds,
+                otherProperties
+        );
     }
     
     private void resetProperties() throws FileNotFoundException {
-        dimensionality = -1;
-        dimensions = null;
-        spacing = null;
-        size = null;
-        offset = null;
-        transformMatrix = null;
         otherProperties.clear();
-        byteOrderSet = false;
-        headerSize = 0;
-        dataFile = null;
-        local = false;
-        dataTypeString = null;
-        dataType = null;
-        bytes = null;
-
+        
+        dimensionality      = -1;
+        numberOfChannels    = 1;
+        headerSize          = 0;
+        dimensions          = null;
+        spacing             = null;
+        size                = null;
+        origin              = null;
+        transformMatrix     = null;
+        dataFile            = null;
+        componentType       = null;
+        bytes               = null;
+        local               = false;
+        pixelType           = PixelType.SCALAR;
+        
         line = null;
         key = null;
         value = null;
@@ -219,21 +236,22 @@ public class MetaImageReader extends ImageReader {
                         throw new UnsupportedOperationException("Compressed data is not (yet) supported");
                     }
                     break;
-                case MetaImageUtilities.OFFSET:
-                    parseOffset(value);
+                case MetaImageUtilities.ORIGIN:
+                    parseOrigin(value);
                     break;
                 case MetaImageUtilities.ELEMENT_TYPE:
-                    dataTypeString = value;
+                    componentType = ComponentType.valueOf(value);
                     break;
                 case MetaImageUtilities.TRANSFORM_MATRIX:
                     parseTransformMatrix(value);
                     break;
                 case MetaImageUtilities.ELEMENT_NUMBER_OF_CHANNELS:
                     int i = Integer.parseInt(value);
-                    if (i != 1) {
-                        throw new IllegalArgumentException("Currently, only a value of 1 for ElementNumberOfChannels is supported");
+                    if (i < 1) {
+                        throw new IllegalArgumentException("ElementNumberOfChannels " +
+                                "must be greater than or equal to 1");
                     }
-                    addOtherProperty(key, value);
+                    numberOfChannels = i;
                     break;
                 case MetaImageUtilities.HEADER_SIZE:
                     headerSize = Integer.parseInt(value);
@@ -244,7 +262,6 @@ public class MetaImageReader extends ImageReader {
                 case MetaImageUtilities.BINARYDATA_BYTEORDER_MSB:
                 case MetaImageUtilities.ELEMENT_BYTEORDER_MSB:
                     byteOrder = Boolean.parseBoolean(value) ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN;
-                    byteOrderSet = true;
                     break;
                 case MetaImageUtilities.CENTER_OF_ROTATION:
                 case MetaImageUtilities.ANATOMICAL_ORIENTATION:
@@ -260,51 +277,59 @@ public class MetaImageReader extends ImageReader {
     
     private void parseDimSize(String value) {
         String[] dims = value.split("\\s+");
-        dimensions = new int[dims.length];
-        for(int i = 0; i < dims.length; i++) {
-            dimensions[i] = Integer.parseInt(dims[i]);
-            if(dimensions[i] <= 0) {
-                throw new IllegalArgumentException("Dimension size cannot be smaller than or equal to 0");
-            }
+        dimensions = LongBuffer.allocate(dims.length);
+        
+        LongStream is = Arrays.stream(dims).mapToLong(Long::parseLong);
+        
+        if(is.allMatch(i -> i > 0)) {
+            is.forEachOrdered(dimensions::put);
+        } else {
+            throw new IllegalArgumentException("Dimension size cannot be smaller than or equal to 0");
         }
     }
     
     private void parseElementSize(String value) {
         String[] splSize = value.split("\\s+");
-        size = new double[splSize.length];
-        for(int i = 0; i < splSize.length; i++) {
-            size[i] = Double.parseDouble(splSize[i]);
-            if(size[i] < Double.MIN_VALUE) {
-                throw new IllegalArgumentException("Size cannot be smaller than or equal to 0");
-            }
+        size = DoubleBuffer.allocate(splSize.length);
+    
+        DoubleStream ds  = Arrays.stream(splSize)
+                .mapToDouble(Double::parseDouble);
+        if(ds.allMatch(d -> d > Double.MIN_VALUE)) {
+            ds.forEachOrdered(size::put);
+        } else {
+            throw new IllegalArgumentException("Size cannot be smaller than or equal to 0");
         }
     }
     
     private void parseElementSpacing(String value) {
         String[] splSpacing = value.split("\\s+");
-        spacing = new double[splSpacing.length];
-        for(int i = 0; i < splSpacing.length; i++) {
-            spacing[i] = Double.parseDouble(splSpacing[i]);
-            if(spacing[i] < Double.MIN_VALUE) {
-                throw new IllegalArgumentException("Spacing cannot be smaller than or equal to 0");
-            }
+        spacing = DoubleBuffer.allocate(splSpacing.length);
+    
+        DoubleStream ds  = Arrays.stream(splSpacing)
+                .mapToDouble(Double::parseDouble);
+        if(ds.allMatch(d -> d > Double.MIN_VALUE)) {
+            ds.forEachOrdered(spacing::put);
+        } else {
+            throw new IllegalArgumentException("Spacing cannot be smaller than or equal to 0");
         }
     }
     
-    private void parseOffset(String value) {
+    private void parseOrigin(String value) {
         String[] split = value.split("\\s+");
-        offset = new double[split.length];
-        for(int i = 0; i < offset.length; i++) {
-            offset[i] = Double.parseDouble(split[i]);
-        }
+        origin = DoubleBuffer.allocate(split.length);
+        
+        Arrays.stream(split)
+                .mapToDouble(Double::parseDouble)
+                .forEachOrdered(origin::put);
     }
     
     private void parseTransformMatrix(String value) {
         String[] split = value.split("\\s+");
-        transformMatrix = new double[split.length];
-        for(int i = 0; i < transformMatrix.length; i++) {
-            transformMatrix[i] = Double.parseDouble(split[i]);
-        }
+        transformMatrix = DoubleBuffer.allocate(split.length);
+        
+        Arrays.stream(split)
+                .mapToDouble(Double::parseDouble)
+                .forEachOrdered(transformMatrix::put);
     }
     
     private void parseDataFile(String value) {
@@ -323,15 +348,16 @@ public class MetaImageReader extends ImageReader {
     }
     
     private void addOtherProperty(String key, String value) {
-        otherProperties.add(new Pair<>(key, value));
+        otherProperties.add(new ImmutablePair<>(key, value));
     }
     
     private void readBinary() throws IOException {
         int num = 1;
-        for(int i = 0; i < dimensionality; i++) {
-            num *= dimensions[i];
+        dimensions.rewind();
+        while (dimensions.hasRemaining()){
+            num *= dimensions.get();
         }
-        num *= dataType.numBytes;
+        num *= componentType.numberOfBytes * numberOfChannels;
         
         bytes = ByteBuffer.allocate(num).order(byteOrder);
         byte[] internal = bytes.array();
