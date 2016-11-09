@@ -1,18 +1,18 @@
 package nl.ramondevaan.visualization.image;
 
-import javafx.util.Pair;
-import nl.ramondevaan.visualization.data.DataTypeFactory;
 import nl.ramondevaan.visualization.utilities.DataUtils;
-import static nl.ramondevaan.visualization.utilities.MetaImageUtilities.*;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
-import java.io.*;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.*;
 import java.util.Iterator;
 
+import static nl.ramondevaan.visualization.utilities.MetaImageUtilities.*;
+
 public class MetaImageWriter extends ImageWriter {
-    private OutputStream stream;
+    private FileOutputStream stream;
     private String rawPath;
     private boolean local;
     private boolean hideElementDataFile;
@@ -47,7 +47,7 @@ public class MetaImageWriter extends ImageWriter {
         if(tmpRawPath == null) {
             tmpRawPath = FilenameUtils.getBaseName(path) + ".raw";
         }
-        stream = new BufferedOutputStream(new FileOutputStream(file));
+        stream = new FileOutputStream(file);
         
         printProperty(OBJECT_TYPE,                  IMAGE);
         printProperty(N_DIMS,                       image.dimensionality);
@@ -75,12 +75,12 @@ public class MetaImageWriter extends ImageWriter {
                 return;
             }
     
-            stream = new BufferedOutputStream(new FileOutputStream(
-                    FilenameUtils.concat(FilenameUtils.getFullPath(path), tmpRawPath)));
+            stream = new FileOutputStream(FilenameUtils.concat(
+                    FilenameUtils.getFullPath(path), tmpRawPath));
         } else {
             printProperty(ELEMENT_DATAFILE, LOCAL);
         }
-        stream.write(image.values.array());
+        stream.getChannel().write(image.getValues());
         stream.close();
     }
     

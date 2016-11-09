@@ -25,8 +25,11 @@ public abstract class Stage {
             throw new IllegalArgumentException("Component is already running");
         }
         running = true;
-        updateLongImpl();
-        running = false;
+        try {
+            updateLongImpl();
+        } finally {
+            running = false;
+        }
         return updated;
     }
     

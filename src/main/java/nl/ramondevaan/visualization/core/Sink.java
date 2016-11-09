@@ -54,7 +54,7 @@ public abstract class Sink<T> extends Stage {
                 }
             }
         }
-        if(updated - maxUpdated < 0) {
+        if(updated - maxUpdated <= 0) {
             updateImpl();
             updated = System.nanoTime();
         }

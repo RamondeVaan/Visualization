@@ -11,12 +11,10 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
-import java.nio.LongBuffer;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.DoubleStream;
-import java.util.stream.LongStream;
 
 public class MetaImageReader extends ImageReader {
     private final static char LF = 10;
@@ -24,7 +22,7 @@ public class MetaImageReader extends ImageReader {
     
     private int                                 dimensionality;
     private int                                 numberOfChannels;
-    private LongBuffer                          dimensions;
+    private IntBuffer                           dimensions;
     private DoubleBuffer                        spacing;
     private DoubleBuffer                        size;
     private DoubleBuffer                        origin;
@@ -108,7 +106,7 @@ public class MetaImageReader extends ImageReader {
         readBinary();
         stream.close();
     
-        LongBuffer extent = LongBuffer.allocate(2 * dimensions.capacity());
+        IntBuffer extent = IntBuffer.allocate(2 * dimensions.capacity());
         dimensions.rewind();
         while (dimensions.hasRemaining()) {
             extent.put(0);
@@ -132,6 +130,15 @@ public class MetaImageReader extends ImageReader {
         pixelType = numberOfChannels == 1 ?
                 PixelType.SCALAR :
                 PixelType.VECTOR;
+    
+        extent          .rewind();
+        bounds          .rewind();
+        dimensions      .rewind();
+        spacing         .rewind();
+        size            .rewind();
+        origin          .rewind();
+        transformMatrix .rewind();
+        bytes           .rewind();
         
         return new Image(
                 componentType,
@@ -277,41 +284,47 @@ public class MetaImageReader extends ImageReader {
     
     private void parseDimSize(String value) {
         String[] dims = value.split("\\s+");
-        dimensions = LongBuffer.allocate(dims.length);
+        dimensions = IntBuffer.allocate(dims.length);
         
-        LongStream is = Arrays.stream(dims).mapToLong(Long::parseLong);
-        
-        if(is.allMatch(i -> i > 0)) {
-            is.forEachOrdered(dimensions::put);
-        } else {
-            throw new IllegalArgumentException("Dimension size cannot be smaller than or equal to 0");
-        }
+        Arrays.stream(dims)
+                .mapToInt(Integer::parseInt)
+                .forEachOrdered(i -> {
+                    if(i <= 0) {
+                        throw new IllegalArgumentException(
+                                "Dimension size cannot be smaller than or equal to 0");
+                    }
+                    dimensions.put(i);
+                });
     }
     
     private void parseElementSize(String value) {
         String[] splSize = value.split("\\s+");
         size = DoubleBuffer.allocate(splSize.length);
     
-        DoubleStream ds  = Arrays.stream(splSize)
-                .mapToDouble(Double::parseDouble);
-        if(ds.allMatch(d -> d > Double.MIN_VALUE)) {
-            ds.forEachOrdered(size::put);
-        } else {
-            throw new IllegalArgumentException("Size cannot be smaller than or equal to 0");
-        }
+        Arrays.stream(splSize)
+                .mapToDouble(Double::parseDouble)
+                .forEachOrdered(d -> {
+                    if(d < Double.MIN_VALUE) {
+                        throw new IllegalArgumentException(
+                                "Size cannot be smaller than or equal to 0");
+                    }
+                    size.put(d);
+                });
     }
     
     private void parseElementSpacing(String value) {
         String[] splSpacing = value.split("\\s+");
         spacing = DoubleBuffer.allocate(splSpacing.length);
     
-        DoubleStream ds  = Arrays.stream(splSpacing)
-                .mapToDouble(Double::parseDouble);
-        if(ds.allMatch(d -> d > Double.MIN_VALUE)) {
-            ds.forEachOrdered(spacing::put);
-        } else {
-            throw new IllegalArgumentException("Spacing cannot be smaller than or equal to 0");
-        }
+        Arrays.stream(splSpacing)
+                .mapToDouble(Double::parseDouble)
+                .forEachOrdered(d -> {
+                    if(d < Double.MIN_VALUE) {
+                        throw new IllegalArgumentException(
+                                "Spacing cannot be smaller than or equal to 0");
+                    }
+                    spacing.put(d);
+                });
     }
     
     private void parseOrigin(String value) {

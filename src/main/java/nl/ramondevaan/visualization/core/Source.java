@@ -5,7 +5,7 @@ public abstract class Source<T> extends Stage {
     
     @Override
     void updateLongImpl() throws Exception {
-        if(updated - changed < 0) {
+        if(updated - changed <= 0) {
             try {
                 output = updateImpl();
                 updated = System.nanoTime();

@@ -1,15 +1,11 @@
 package nl.ramondevaan.visualization.image;
 
 import nl.ramondevaan.visualization.data.ComponentType;
-import nl.ramondevaan.visualization.data.DataType;
 import nl.ramondevaan.visualization.data.PixelType;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.DoubleBuffer;
-import java.nio.LongBuffer;
+import java.nio.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,13 +17,13 @@ public class Image {
     public final ByteOrder                      byteOrder;
     final int                                   dataDimensionality;
     final int                                   dimensionality;
-    final LongBuffer                            dimensions;
+    final IntBuffer                             dimensions;
     final DoubleBuffer                          spacing;
     final DoubleBuffer                          pixelSize;
     final DoubleBuffer                          origin;
     final DoubleBuffer                          transformMatrix;
-    final ByteBuffer                            values;
-    final LongBuffer                            extent;
+    ByteBuffer                                  values;
+    final IntBuffer                             extent;
     final DoubleBuffer                          bounds;
     final List<ImmutablePair<String, String>>   extraProperties;
 
@@ -73,9 +69,6 @@ public class Image {
         if(dataDimensionality <= 0) {
             throw new IllegalArgumentException("Data dimensionality must be at least 1");
         }
-        if(dimensions.length != dimensionality) {
-            throw new IllegalArgumentException("Given dimensions had incorrect dimensionality");
-        }
         if(spacing.length != dimensionality) {
             throw new IllegalArgumentException("Given spacing had incorrect dimensionality");
         }
@@ -104,19 +97,21 @@ public class Image {
         if(values.length != componentType.numberOfBytes * num * dataDimensionality) {
             throw new IllegalArgumentException("Values were of incorrect length");
         }
-        LongBuffer      extentTemp      = LongBuffer.allocate(2 * dimensionality);
-        DoubleBuffer    boundsTemp      = DoubleBuffer.allocate(extentTemp.capacity());
-        LongBuffer      dimensionsTemp  = LongBuffer.allocate(dimensionality);
-        DoubleBuffer    spacingTemp     = DoubleBuffer.allocate(dimensionality);
-        DoubleBuffer    sizeTemp        = DoubleBuffer.allocate(dimensionality);
-        DoubleBuffer    originTemp      = DoubleBuffer.allocate(dimensionality);
-        DoubleBuffer    tMatrixTemp     = DoubleBuffer.allocate(dimensionality * dimensionality);
-        ByteBuffer      valuesTemp      = ByteBuffer.allocate(values.length);
+        IntBuffer       extentTemp      = IntBuffer     .allocate(dimensionality * 2);
+        DoubleBuffer    boundsTemp      = DoubleBuffer  .allocate(extentTemp.capacity());
+        IntBuffer       dimensionsTemp  = IntBuffer     .allocate(dimensionality);
+        DoubleBuffer    spacingTemp     = DoubleBuffer  .allocate(dimensionality);
+        DoubleBuffer    sizeTemp        = DoubleBuffer  .allocate(dimensionality);
+        DoubleBuffer    originTemp      = DoubleBuffer  .allocate(dimensionality);
+        DoubleBuffer    tMatrixTemp     = DoubleBuffer  .allocate(dimensionality * dimensionality);
+        ByteBuffer      valuesTemp      = ByteBuffer    .allocate(values.length);
         List<ImmutablePair<String, String>> extraProps = new ArrayList<>();
 
+        double orig;
         for(int i = 0; i < dimensionality; i++) {
-            boundsTemp.put(origin[i]);
-            boundsTemp.put(origin[i] + dimensions[i] * spacing[i]);
+            orig = origin[i] - spacing[i] / 2d;
+            boundsTemp.put(orig);
+            boundsTemp.put(orig + dimensions[i] * spacing[i]);
             extentTemp.put(0);
             extentTemp.put(dimensions[i] - 1);
 
@@ -131,24 +126,32 @@ public class Image {
         }
         extraProps.addAll(extraProperties);
 
-        extent  = extentTemp.asReadOnlyBuffer();
-        bounds  = boundsTemp.asReadOnlyBuffer();
-
+        this.extent             = extentTemp    .asReadOnlyBuffer();
+        this.bounds             = boundsTemp    .asReadOnlyBuffer();
         this.dimensions         = dimensionsTemp.asReadOnlyBuffer();
         this.spacing            = spacingTemp   .asReadOnlyBuffer();
         this.pixelSize          = sizeTemp      .asReadOnlyBuffer();
         this.origin             = originTemp    .asReadOnlyBuffer();
         this.transformMatrix    = tMatrixTemp   .asReadOnlyBuffer();
         this.values             = valuesTemp    .asReadOnlyBuffer();
-        
+    
+        this.extent             .rewind();
+        this.bounds             .rewind();
+        this.dimensions         .rewind();
+        this.spacing            .rewind();
+        this.pixelSize          .rewind();
+        this.origin             .rewind();
+        this.transformMatrix    .rewind();
+        this.values             .rewind();
+    
         this.dataDimensionality = dataDimensionality;
         this.extraProperties    = Collections.unmodifiableList(extraProps);
     }
 
     Image(ComponentType componentType, PixelType pixelType, ByteOrder byteOrder,
-          int dataDimensionality, LongBuffer dimensions, DoubleBuffer spacing,
+          int dataDimensionality, IntBuffer dimensions, DoubleBuffer spacing,
           DoubleBuffer pixelSize, DoubleBuffer origin, DoubleBuffer transformMatrix,
-          ByteBuffer values, LongBuffer extent, DoubleBuffer bounds,
+          ByteBuffer values, IntBuffer extent, DoubleBuffer bounds,
           List<ImmutablePair<String, String>> extraProps) {
         this.componentType      = componentType;
         this.pixelType          = pixelType;
@@ -167,9 +170,9 @@ public class Image {
     }
 
     Image(ComponentType componentType, PixelType pixelType, ByteOrder byteOrder,
-          int dataDimensionality, LongBuffer dimensions, DoubleBuffer spacing,
+          int dataDimensionality, IntBuffer dimensions, DoubleBuffer spacing,
           DoubleBuffer pixelSize, DoubleBuffer origin, DoubleBuffer transformMatrix,
-          ByteBuffer values, LongBuffer extent, DoubleBuffer bounds) {
+          ByteBuffer values, IntBuffer extent, DoubleBuffer bounds) {
         this.componentType      = componentType;
         this.pixelType          = pixelType;
         this.byteOrder          = byteOrder;
@@ -194,7 +197,7 @@ public class Image {
         return dimensionality;
     }
 
-    public final LongBuffer getDimensions() {
+    public final IntBuffer getDimensions() {
         return dimensions.duplicate();
     }
 
@@ -218,7 +221,7 @@ public class Image {
         return values.duplicate();
     }
 
-    public final LongBuffer getExtent() {
+    public final IntBuffer getExtent() {
         return extent.duplicate();
     }
 

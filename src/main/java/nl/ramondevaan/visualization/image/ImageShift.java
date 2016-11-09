@@ -2,17 +2,20 @@ package nl.ramondevaan.visualization.image;
 
 import nl.ramondevaan.visualization.core.Filter;
 import nl.ramondevaan.visualization.core.Source;
-import nl.ramondevaan.visualization.data.DataType;
-import org.apache.commons.lang3.ArrayUtils;
+import nl.ramondevaan.visualization.utilities.DataUtils;
+import org.apache.commons.lang3.Validate;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 public class ImageShift extends Filter<Image, Image> {
-    private int[] shift;
-    private byte[] fillValue;
-    
-    private int dimensionality;
+    private IntBuffer   shift;
+    private ByteBuffer  fillValue;
     
     public ImageShift() {
         super(1);
@@ -23,15 +26,61 @@ public class ImageShift extends Filter<Image, Image> {
     }
     
     public final void setShift(int[] shift) {
-        if(!Arrays.equals(this.shift, shift)) {
-            this.shift = ArrayUtils.clone(shift);
+        Validate.notNull(shift);
+        if(this.shift == null) {
+            this.shift = IntBuffer.allocate(shift.length);
+            this.shift.put(shift);
+            return;
+        }
+        IntBuffer shiftTemp = IntBuffer.allocate(shift.length);
+        shiftTemp.put(shift);
+        
+        shiftTemp.rewind();
+        this.shift.rewind();
+        
+        if(!shiftTemp.equals(this.shift)) {
+            this.shift = shiftTemp;
+            changed();
+        }
+    }
+    
+    public final void setShift(IntBuffer shift) {
+        if(this.shift == null) {
+            this.shift = DataUtils.clone(shift);
+            return;
+        }
+        shift.rewind();
+        this.shift.rewind();
+        if(!shift.equals(this.shift)) {
+            this.shift = DataUtils.clone(shift);
             changed();
         }
     }
     
     public final void setFillValue(byte[] fillValue) {
-        if(!Arrays.equals(this.fillValue, fillValue)) {
-            this.fillValue = ArrayUtils.clone(fillValue);
+        if(fillValue == null) {
+            this.fillValue = null;
+            return;
+        }
+        ByteBuffer fillValueTemp = ByteBuffer.allocate(fillValue.length);
+        fillValueTemp.put(fillValue);
+        
+        fillValueTemp.rewind();
+        
+        if(!fillValueTemp.equals(this.fillValue)) {
+            this.fillValue = fillValueTemp;
+            changed();
+        }
+    }
+    
+    public final void setFillValue(ByteBuffer fillValue) {
+        if(fillValue == null) {
+            this.fillValue = null;
+            return;
+        }
+        fillValue.rewind();
+        if(!fillValue.equals(this.fillValue)) {
+            this.fillValue = DataUtils.clone(fillValue);
             changed();
         }
     }
@@ -39,96 +88,113 @@ public class ImageShift extends Filter<Image, Image> {
     @Override
     protected Image updateImpl() throws Exception {
         Image input = getInput(0);
-        
-        if(ArrayUtils.isEmpty(shift) ||
-                Arrays.equals(new int[shift.length], shift)) {
-            return input.copy();
+        Validate.notNull(input);
+    
+        if(shift == null || DataUtils.allZero(shift)) {
+            return input;
         }
-        if(fillValue == null) {
-            fillValue = new byte[input.dataType.numBytes];
-            input.dataType.zero.rewind();
-            input.dataType.zero.get(fillValue);
-        } else if(fillValue.length != input.dataType.numBytes) {
-            throw new IllegalArgumentException("Fill byte length was incorrect");
+    
+        //Compute the extension used (based on dimensionality)
+        IntBuffer shiftUsed = IntBuffer.allocate(input.dimensionality);
+        shift.limit(input.dimensionality);
+        shift.rewind();
+        shiftUsed.put(shift);
+        while(shiftUsed.hasRemaining()) {
+            shiftUsed.put(0);
         }
-        
+        shift.limit(shift.capacity());
+    
         Image output = constructOutput(input);
-        setZeros(input, output);
-        setValues(input, output);
-
+        setZeros(input, output, shiftUsed);
+        setValues(input, output, shiftUsed);
+        output.values = output.values.asReadOnlyBuffer();
+    
         return output;
     }
         
     private Image constructOutput(Image input) {
-        dimensionality = input.dimensionality;
-        if(shift.length < dimensionality) {
-            int[] t = new int[dimensionality];
-            System.arraycopy(shift, 0, t, 0, shift.length);
-            this.shift = t;
-        }
+        //Copy other properties
+        List<ImmutablePair<String, String>> extraProperties =
+                new ArrayList<>(input.extraProperties);
         
-        DataType dataType = input.dataType.copy();
-        double[] spacing = new double[dimensionality];
-        double[] size = new double[dimensionality];
-        double[] offset = new double[dimensionality];
-        double[] transform = new double[input.transformMatrix.length];
-        byte[] values = new byte[input.values.capacity()];
-        
-        System.arraycopy(input.spacing, 0, spacing, 0, dimensionality);
-        System.arraycopy(input.size, 0, size, 0, dimensionality);
-        System.arraycopy(input.offset, 0, offset, 0, dimensionality);
-        System.arraycopy(input.transformMatrix, 0, transform, 0, transform.length);
-        
-        for(int i = 0; i < dimensionality; i++) {
-            if(shift[i] < 0) {
-                offset[i] += shift[i] * spacing[i];
-            }
-        }
-        
-        int[] extent = new int[input.extent.length];
-        for(int i = 0; i < dimensionality; i++) {
-            extent[2 * i + 1] = input.dimensions[i] - 1;
-        }
-        double[] bounds = new double[input.bounds.length];
-        System.arraycopy(input.bounds, 0, bounds, 0, bounds.length);
-        
-        return new Image(dataType, dimensionality, input.dimensions,
-                spacing, size, offset, transform, ByteBuffer.wrap(values),
-                extent, bounds, input.extraProperties);
+        return new Image(
+                input.componentType,
+                input.pixelType,
+                input.byteOrder,
+                input.dataDimensionality,
+                input.getDimensions(),
+                input.getSpacing(),
+                input.getPixelSize(),
+                input.getOrigin(),
+                input.getTransformMatrix(),
+                ByteBuffer.allocate(input.values.capacity()),
+                input.getExtent(),
+                input.getBounds(),
+                Collections.unmodifiableList(extraProperties)
+        );
     }
     
-    private void setZeros(Image input, Image output) {
-        int[] region = new int[input.extent.length];
+    private void setZeros(Image input, Image output, IntBuffer shiftUsed) {
+        final int dataLen = input.componentType.numberOfBytes * input.dataDimensionality;
+    
+        IntBuffer inputDimensions   = input.getDimensions();
+        ByteBuffer fillValueUsed    = ByteBuffer.allocate(dataLen);
+    
+        int shift;
+        int inDim;
+        
+        //Compute the fillValue used
+        //If none is set, the zero value for the component type is used.
+        if(fillValue == null) {
+            for(int i = 0; i < input.dataDimensionality; i++) {
+                fillValueUsed.put(input.componentType.getZero());
+            }
+        } else if(fillValue.limit() != dataLen) {
+            throw new IllegalArgumentException("Fill byte length was incorrect");
+        } else {
+            fillValueUsed.put(fillValue);
+            fillValue.rewind();
+        }
+        fillValueUsed.rewind();
+        
+        //Copy the input extent
+        int[] region = new int[input.dimensionality * 2];
         int a1, a2;
-        for(int i = 0; i < dimensionality; i++) {
+        for(int i = 0; i < input.dimensionality; i++) {
             a1 = 2 * i;
             a2 = a1 + 1;
             region[a1] = 0;
-            region[a2] = input.dimensions[i] - 1;
+            region[a2] = inputDimensions.get() - 1;
         }
+        
+        //Set zero values to non-overlapping regions
         int[] other = new int[2];
-        for(int i = 0; i < dimensionality; i++) {
-            if(shift[i] == 0) {
+        shiftUsed       .rewind();
+        inputDimensions .rewind();
+        for(int i = 0; i < input.dimensionality; i++) {
+            shift = shiftUsed.get();
+            inDim = inputDimensions.get();
+            if(shift == 0) {
                 continue;
             }
             a1 = 2 * i;
             a2 = a1 + 1;
-            if(shift[i] > 0) {
+            if(shift > 0) {
                 region[a1] = 0;
-                region[a2] = shift[i] - 1;
-                other[0] = shift[i];
-                other[1] = input.dimensions[i] - 1;
+                region[a2] = shift - 1;
+                other[0] = shift;
+                other[1] = inDim - 1;
             } else {
-                region[a1] = input.dimensions[i] - shift[i];
-                region[a2] = input.dimensions[i] - 1;
+                region[a1] = inDim + shift;
+                region[a2] = inDim - 1;
                 other[0] = 0;
                 other[1] = region[a1] - 1;
             }
             
             ImageRegionIterator it = new ImageRegionIterator(output, region);
             while(it.hasNext()) {
-                it.set(fillValue);
-                it.next();
+                it.next().put(fillValueUsed);
+                fillValueUsed.rewind();
             }
             
             region[a1] = other[0];
@@ -136,31 +202,36 @@ public class ImageShift extends Filter<Image, Image> {
         }
     }
     
-    private void setValues(Image input, Image output) {
-        int[] inRegion = new int[input.extent.length];
-        int[] outRegion = new int[output.extent.length];
+    private void setValues(Image input, Image output, IntBuffer shiftUsed) {
+        int[] inRegion  = new int[input.dimensionality * 2];
+        int[] outRegion = new int[output.dimensionality * 2];
+        
+        IntBuffer inputDimensions   = input .getDimensions();
+        IntBuffer outputDimensions  = output.getDimensions();
+        
+        shiftUsed.rewind();
+        int shift;
         
         int a1, a2;
-        for(int i = 0; i < dimensionality; i++) {
+        for(int i = 0; i < input.dimensionality; i++) {
+            shift = shiftUsed.get();
             a1 = 2 * i;
             a2 = a1 + 1;
-            if(shift[i] > 0) {
-                inRegion[a2] = input.dimensions[i] - 1 - shift[i];
-                outRegion[a1] = shift[i];
-                outRegion[a2] = output.dimensions[i] - 1;
+            if(shift > 0) {
+                inRegion[a2] = inputDimensions.get() - 1 - shift;
+                outRegion[a1] = shift;
+                outRegion[a2] = outputDimensions.get() - 1;
             } else {
-                outRegion[a2] = input.dimensions[i] - 1 - shift[i];
-                inRegion[a1] = shift[i];
-                inRegion[a2] = output.dimensions[i] - 1;
+                outRegion[a2] = inputDimensions.get() - 1 + shift;
+                inRegion[a1] = -shift;
+                inRegion[a2] = outputDimensions.get() - 1;
             }
         }
         ImageRegionIterator in = new ImageRegionIterator(input, inRegion);
         ImageRegionIterator out = new ImageRegionIterator(output, outRegion);
         
         while(in.hasNext()) {
-            out.set(in.get());
-            in.next();
-            out.next();
+            out.next().put(in.next());
         }
     }
 }

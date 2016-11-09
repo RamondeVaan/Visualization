@@ -1,25 +1,24 @@
 package nl.ramondevaan.visualization.image;
 
 import java.nio.ByteBuffer;
-import java.nio.LongBuffer;
+import java.nio.IntBuffer;
 import java.util.Iterator;
 
 public class ImageRegionIterator implements Iterator<ByteBuffer> {
     private final int           dimensionality;
-    private final int           dmin1;
     private final int           valueLength;
     private final int[]         min;
     private final int[]         max;
     private final int[]         cur;
     private final int[]         skip;
-    private final LongBuffer    dimensions;
+    private final IntBuffer     dimensions;
     private final ByteBuffer    values;
     
     private int                 curDim;
     
     public ImageRegionIterator(Image image, int[] region) {
         this.dimensionality = image.dimensionality;
-        this.dmin1          = this.dimensionality - 1;
+        final int dmin1 = this.dimensionality - 1;
         this.dimensions     = image.getDimensions();
         
         if(region.length != dimensionality * 2) {
@@ -53,7 +52,7 @@ public class ImageRegionIterator implements Iterator<ByteBuffer> {
             for(int j = 0; j < i; j++) {
                 num *= dimensions.get(j);
             }
-            skip[i + 1] = Math.toIntExact((min[i] + dimensions.get(i) - max[i] - 1) * num * valueLength);
+            skip[i + 1] = (min[i] + dimensions.get(i) - max[i] - 1) * num * valueLength;
         }
         for(int i = 1; i < skip.length; i++) {
             skip[i] += skip[i - 1];

@@ -53,7 +53,7 @@ public abstract class Filter<S, T> extends Source<T> {
                 }
             }
         }
-        if(updated - maxUpdated < 0) {
+        if(updated - maxUpdated <= 0) {
             try {
                 output = updateImpl();
                 updated = System.nanoTime();
