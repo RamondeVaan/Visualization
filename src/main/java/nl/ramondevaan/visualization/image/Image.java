@@ -12,20 +12,20 @@ import java.util.Collections;
 import java.util.List;
 
 public class Image {
-    public final ComponentType                  componentType;
-    public final PixelType                      pixelType;
-    public final ByteOrder                      byteOrder;
-    final int                                   dataDimensionality;
-    final int                                   dimensionality;
-    final IntBuffer                             dimensions;
-    final DoubleBuffer                          spacing;
-    final DoubleBuffer                          pixelSize;
-    final DoubleBuffer                          origin;
-    final DoubleBuffer                          transformMatrix;
-    ByteBuffer                                  values;
-    final IntBuffer                             extent;
-    final DoubleBuffer                          bounds;
-    final List<ImmutablePair<String, String>>   extraProperties;
+    public final ComponentType                          componentType;
+    public final PixelType                              pixelType;
+    public final List<ImmutablePair<String, String>>    extraProperties;
+    public final int                                    dataDimensionality;
+    public final int                                    dimensionality;
+    public final ByteOrder                              byteOrder;
+    final IntBuffer                                     dimensions;
+    final DoubleBuffer                                  spacing;
+    final DoubleBuffer                                  pixelSize;
+    final DoubleBuffer                                  origin;
+    final DoubleBuffer                                  transformMatrix;
+    ByteBuffer                                          values;
+    final IntBuffer                                     extent;
+    final DoubleBuffer                                  bounds;
 
     public Image(ComponentType componentType,   PixelType pixelType,    ByteOrder byteOrder,
                  int dataDimensionality,        int[] dimensions,       double[] spacing,
@@ -189,14 +189,6 @@ public class Image {
         this.extraProperties    = Collections.emptyList();
     }
 
-    public final int getDataDimensionality() {
-        return dataDimensionality;
-    }
-
-    public final int getDimensionality() {
-        return dimensionality;
-    }
-
     public final IntBuffer getDimensions() {
         return dimensions.duplicate();
     }
@@ -227,9 +219,5 @@ public class Image {
 
     public final DoubleBuffer getBounds() {
         return bounds.duplicate();
-    }
-
-    public final List<ImmutablePair<String, String>> getExtraProperties() {
-        return extraProperties;
     }
 }

@@ -47,12 +47,14 @@ public class ImageShift extends Filter<Image, Image> {
     public final void setShift(IntBuffer shift) {
         if(this.shift == null) {
             this.shift = DataUtils.clone(shift);
+            this.shift.rewind();
             return;
         }
         shift.rewind();
         this.shift.rewind();
         if(!shift.equals(this.shift)) {
             this.shift = DataUtils.clone(shift);
+            this.shift.rewind();
             changed();
         }
     }
@@ -81,6 +83,7 @@ public class ImageShift extends Filter<Image, Image> {
         fillValue.rewind();
         if(!fillValue.equals(this.fillValue)) {
             this.fillValue = DataUtils.clone(fillValue);
+            this.fillValue.rewind();
             changed();
         }
     }

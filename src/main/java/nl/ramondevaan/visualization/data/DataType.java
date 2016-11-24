@@ -15,6 +15,7 @@ public abstract class DataType {
         }
         this.numBytes = zero.capacity();
         this.zero = DataUtils.clone(zero).asReadOnlyBuffer();
+        this.zero.rewind();
     }
     
     public final ByteBuffer getZero() {

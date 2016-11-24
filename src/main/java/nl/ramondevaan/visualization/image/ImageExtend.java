@@ -44,12 +44,14 @@ public class ImageExtend extends Filter<Image, Image> {
     public final void setExtension(IntBuffer extension) {
         if(this.extension == null) {
             this.extension = DataUtils.clone(extension);
+            this.extension.rewind();
             return;
         }
         extension.rewind();
         this.extension.rewind();
         if(!extension.equals(this.extension)) {
             this.extension = DataUtils.clone(extension);
+            this.extension.rewind();
             changed();
         }
     }
@@ -78,6 +80,7 @@ public class ImageExtend extends Filter<Image, Image> {
         fillValue.rewind();
         if(!fillValue.equals(this.fillValue)) {
             this.fillValue = DataUtils.clone(fillValue);
+            this.fillValue.rewind();
             changed();
         }
     }

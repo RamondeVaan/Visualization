@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+//TODO: FileChannel instead of inputstream?
+//TODO: Check endianness correct (duplicating and readonly switch to big endian)
 public class MetaImageReader extends ImageReader {
     private final static char LF = 10;
     private final static char CR = 13;

@@ -1,104 +1,147 @@
 package nl.ramondevaan.visualization.mesh;
 
-import java.io.*;
+import org.apache.commons.lang3.ArrayUtils;
+
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.FloatBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class PLYReader extends MeshReader {
     private final static char LF = 10;
     private final static char CR = 13;
-    private final static int dimensionality = 3;
 
-    private boolean coordinatesSet;
-    private boolean facesSet;
-    private int numberOfCoordinates;
-    private ByteBuffer coordinates;
-    private FloatBuffer coordinatesFloat;
-    private int[][] faces;
-    private InputStream stream;
-    private String line;
-    private boolean binary;
-    private ByteOrder byteOrder;
-    
+    private String              lineSeparator;
+
+    private FileInputStream     stream;
+    private FileChannel         channel;
+    private String              tempLine;
+    private String              line;
+
+    private boolean             binary;
+    private ByteOrder           byteOrder;
+    private List<ElementTemp>   elements;
+
     @Override
     protected Mesh read() throws IOException {
-        coordinatesSet = false;
-        facesSet = false;
-        stream = new BufferedInputStream(new FileInputStream(file));
-        line = null;
-        
-        readLine();
-        if(!"ply".equalsIgnoreCase(line)) {
-            throw new IllegalArgumentException("PLY file was of incorrect format");
+        resetVariables();
+        stream  = new FileInputStream(file);
+        channel = stream.getChannel();
+
+        FileLock lock = channel.tryLock(0, Long.MAX_VALUE, true);
+        if(lock == null) {
+            throw new IOException("Could not lock \"" + path + "\".");
         }
+
+        initRead();
+        readFormat();
+
         readLine();
         while(line != null) {
-            line = line.trim();
-            if(line.equalsIgnoreCase("end_header")) {
+            if(line.equals("end_header")) {
                 break;
             } else if(line.startsWith("element")) {
                 readElement();
-            } else if(line.startsWith("format")) {
-                readFormat();
-                readLine();
-            } else if(line.startsWith("comment")) {
-                readLine();
             } else {
                 throw new IllegalArgumentException("Unexpected line:" + System.lineSeparator() + line);
             }
         }
-        if(line == null) {
-            throw new IllegalArgumentException("Could not read PLY headers");
-        }
-        
-        if(!coordinatesSet) {
-            throw new IllegalArgumentException("No vertex information given in header");
-        }
-        if(!facesSet) {
-            throw new IllegalArgumentException("No face information given in header");
-        }
-    
-        if(!binary) {
-            readCoordinatesASCII();
-            readFacesASCII();
-        } else {
-            readCoordinatesBinary();
-            readFacesBinary();
-        }
-    
+
+        readData();
+
         stream.close();
-        
-        return new Mesh(coordinatesFloat, numberOfCoordinates, faces);
+        stream  = null;
+        channel = null;
+
+        List<Element> actElements = elements.stream().map(e -> new Element(
+                e.name,
+                Collections.unmodifiableList(e.properties.stream().map(p -> {
+                    if(p.total < 0) {
+                        return new Property(
+                                p.name,
+                                p.valueBuffer,
+                                p.valueType
+                        );
+                    } else {
+                        return new ListProperty(
+                                p.name,
+                                p.valueBuffer,
+                                p.valueType,
+                                p.listType,
+                                p.listBuffer
+                        );
+                    }
+                }).collect(Collectors.toList())),
+                e.numberOfEntries))
+                .collect(Collectors.toList());
+
+        return (new Mesh.Builder())
+                .setElements(actElements)
+                .setVertexId(PLYUtilities.VERTEX_NAME)
+                .setFaceId(PLYUtilities.FACE_NAME)
+                .setIndicesId(PLYUtilities.INDICES_NAME)
+                .setCoordIds(PLYUtilities.COORD_DIM_NAMES)
+                .setNormalIds(PLYUtilities.NORMAL_DIM_NAMES, false)
+                .build();
     }
-    
-    private void readLine() throws IOException {
-        line = "";
-        int curChar = stream.read();
-        while(curChar != -1 && curChar != LF && curChar != CR) {
-            line += ((char) curChar);
-            curChar = stream.read();
+
+    private void resetVariables() {
+        lineSeparator   = "";
+        tempLine        = "";
+        line            = null;
+        binary          = false;
+        byteOrder       = ByteOrder.BIG_ENDIAN;
+        elements        = new ArrayList<>();
+    }
+
+    private void initRead() throws IOException {
+        lineSeparator = "";
+
+        String s = "";
+        for(int i = 0; i < 3; i++) {
+            s += (char) stream.read();
         }
-        if(curChar == CR) {
-            stream.mark(1);
-            curChar = stream.read();
-            if(curChar != LF) {
-                stream.reset();
+
+        if(!s.equals("ply")) {
+            throw new IOException("PLY file was of incorrect format");
+        }
+
+        char c = (char) stream.read();
+        if(c == LF) {
+            lineSeparator += LF;
+        } else if (c == CR) {
+            char n = (char) stream.read();
+            lineSeparator += CR;
+
+            if(n == LF) {
+                lineSeparator += LF;
+            } else {
+                tempLine = String.valueOf(n);
             }
         }
+        readLine();
     }
-    
+
     private void readFormat() {
+        if(!line.toLowerCase().startsWith("format")) {
+            throw new IllegalArgumentException("Expected format specification, but found:\n" + line);
+        }
         String f = line.replaceAll("\\s+", " ");
         switch(f) {
-            case "format ascii 1.0":
+            case PLYUtilities.FORMAT_ASCII:
                 binary = false;
                 break;
-            case "format binary_little_endian 1.0":
+            case PLYUtilities.FORMAT_LITTLE_ENDIAN:
                 binary = true;
                 byteOrder = ByteOrder.LITTLE_ENDIAN;
                 break;
-            case "format binary_big_endian 1.0":
+            case PLYUtilities.FORMAT_BIG_ENDIAN:
                 binary = true;
                 byteOrder = ByteOrder.BIG_ENDIAN;
                 break;
@@ -106,145 +149,258 @@ public class PLYReader extends MeshReader {
                 throw new IllegalArgumentException("Format \"" + f + "\" is not (yet) supported");
         }
     }
-    
-    private void readElement() throws IOException {
-        String[] split = line.split("\\s+");
-        if(split.length < 2) {
-            throw new IllegalArgumentException("Element was of incorrect format");
-        }
-        
-        String id = split[1];
-        
-        if(id.equalsIgnoreCase("vertex")) {
-            readVertex(split);
-        } else if(id.equalsIgnoreCase("face")) {
-            readFace(split);
-            readLine();
-        } else {
-            throw new IllegalArgumentException("Elements other than " +
-                    "\"face\" or \"vertex\" are not currently supported");
-        }
+
+    private void readLine() throws IOException {
+        do {
+            readLineImpl();
+        } while(line != null && !line.isEmpty() &&
+                line.toLowerCase().trim().startsWith("comment"));
     }
-    
-    private void readVertex(String[] split) throws IOException {
-        if(coordinatesSet) {
-            throw new IllegalArgumentException("Vertex elements were already set");
-        }
-        if(split.length < 3) {
-            throw new IllegalArgumentException("Could not find number of vertices in:" +
-                    System.lineSeparator() + line);
-        }
-       int dimensionality = 0;
-        readLine();
-        while(line != null) {
-            line = line.trim();
-            if(!line.startsWith("property")) {
+
+    private void readLineImpl() throws IOException {
+        line = "";
+        int curChar;
+
+        do {
+            curChar = stream.read();
+            if(curChar == -1) {
                 break;
             }
-            dimensionality++;
-            String[] spl = line.split("\\s+");
-            if(spl.length < 2) {
-                throw new IllegalArgumentException("Property is of incorrect format");
-            }
-            if(!spl[1].equalsIgnoreCase("float")) {
-                throw new IllegalArgumentException("Currently, only float precision is supported");
-            }
-            readLine();
-        }
-        if(dimensionality != PLYReader.dimensionality) {
-            throw new UnsupportedOperationException("Only dimensionality of 3 is currently supported");
-        }
-        numberOfCoordinates = Integer.parseInt(split[2]);
-        coordinates = ByteBuffer.allocate(numberOfCoordinates * dimensionality * 4).order(byteOrder);
-        coordinatesFloat = coordinates.asFloatBuffer();
-        coordinatesSet = true;
+            tempLine += (char) curChar;
+        } while(!tempLine.endsWith(lineSeparator));
+
+        line = tempLine.trim();
+        tempLine = "";
     }
-    
-    private void readFace(String[] split) throws IOException {
-        if(facesSet) {
-            throw new IllegalArgumentException("Face elements were already set");
+
+    private void readElement() throws IOException {
+        String[] split = line.split("\\s+");
+        if(split.length != 3) {
+            throw new IllegalArgumentException("Element was of incorrect format");
         }
-        if(split.length < 3) {
-            throw new IllegalArgumentException("Could not find number of faces in:" +
-                    System.lineSeparator() + line);
+
+        String          name            = split[1];
+        int             numberOfEntries = Integer.parseInt(split[2]);
+        List<PropertyTemp>  properties      = new ArrayList<>();
+
+        for(ElementTemp e : elements) {
+            if(e.name.equals(name)) {
+                throw new IllegalArgumentException("Element name \"" +
+                        name + "\" occurs more than once");
+            }
         }
-        faces = new int[Integer.parseInt(split[2])][];
+        if(numberOfEntries < 0) {
+            throw new IllegalArgumentException("Number of entries for property \"" +
+                    name + "\" must be 0 or greater");
+        }
+
         readLine();
-        if(line == null) {
-            throw new IllegalArgumentException("Unexpected eof");
-        }
-        line = line.trim();
-        if(!line.equalsIgnoreCase("property list uchar int vertex_indices")) {
-            throw new IllegalArgumentException("Currently only " +
-                    "\"property list uchar int vertex_indices\" is accepted for faces");
-        }
-        facesSet = true;
-    }
-    
-    private void readCoordinatesBinary() throws IOException {
-        byte[] bytes = coordinates.array();
-        int k = stream.read(bytes, 0, bytes.length);
-        if(k < bytes.length) {
-            throw new IOException("Could not read required number of bytes");
-        }
-    }
-    
-    private void readCoordinatesASCII() throws IOException {
-        String[] split;
-        for(int i = 0; i < numberOfCoordinates; i++) {
-            readLine();
-            split = line.split("\\s+");
-            if(split.length != dimensionality) {
-                throw new IOException("File had incorrect format:"
-                        + System.lineSeparator() + line);
-            }
-            coordinates.putFloat(Float.parseFloat(split[0]));
-            coordinates.putFloat(Float.parseFloat(split[1]));
-            coordinates.putFloat(Float.parseFloat(split[2]));
-        }
-    }
-    
-    private void readFacesASCII() throws IOException {
-        String[] split;
-        for(int i = 0; i < faces.length; i++) {
-            readLine();
-            split = line.split("\\s+");
-            int num = Integer.parseInt(split[0]);
-            if(num <= 0) {
-                throw new IOException("Faces cannot have 0 or less coordinates");
-            }
-            if(split.length != num + 1) {
-                throw new IOException("Specified number of coordinates " +
-                        "was not equal to number of coordinates read");
-            }
-            faces[i] = new int[num];
-            for(int j = 0; j < num; j++) {
-                faces[i][j] = Integer.parseInt(split[j + 1]);
-            }
-        }
-    }
-    
-    private void readFacesBinary() throws IOException {
-        int num;
-        byte[] vals = new byte[4];
-        int read;
-        
-        for(int i = 0; i < faces.length; i++) {
-            num = stream.read();
-            
-            if(num <= 0) {
-                throw new IOException("Faces cannot have 0 or less coordinates");
-            }
-            
-            faces[i] = new int[num];
-            for(int j = 0; j < num; j++) {
-                read = stream.read(vals, 0, 4);
-                if(read != 4) {
-                    throw new IOException("Could not read specified number of bytes");
+        PropertyTemp property;
+        while(line.toLowerCase().startsWith("property")) {
+            property = readProperty(numberOfEntries);
+            for(PropertyTemp p : properties) {
+                if(p.name.equals(property.name)) {
+                    throw new IllegalArgumentException("Property \"" +
+                            p.name + "\" occurs more than once in element \"" +
+                            name + "\"");
                 }
-                
-                faces[i][j] = ByteBuffer.wrap(vals).order(byteOrder).getInt();
             }
+            properties.add(property);
+            readLine();
+        }
+
+        elements.add(new ElementTemp(
+                name,
+                numberOfEntries,
+                Collections.unmodifiableList(properties)
+        ));
+    }
+
+    private PropertyTemp readProperty(int entries) throws IOException {
+        String[] split = line.split("\\s+");
+
+        if(split.length == 5) {
+            //List property
+            if(!split[1].toLowerCase().equals("list")) {
+                throw new IllegalArgumentException("Error in parsing property:\n" + line);
+            }
+
+            String          name        = split[4];
+            PropertyType    dataType    = PropertyType.parse(split[2]);
+            PropertyType    listType    = PropertyType.parse(split[3]);
+            ByteBuffer      dataBuffer  = ByteBuffer.allocate(entries * dataType.numberOfBytes).order(byteOrder);
+
+            return new PropertyTemp(name, dataType, dataBuffer, listType, new ByteBuffer[entries], 0);
+        } else if (split.length == 3) {
+            //Single value property
+            String          name = split[2];
+            PropertyType    type = PropertyType.parse(split[1]);
+            ByteBuffer      buff = ByteBuffer.allocate(entries * type.numberOfBytes).order(byteOrder);
+
+            return new PropertyTemp(name, type, buff, null, null, -1);
+        } else {
+            throw new IllegalArgumentException("Error in parsing property:\n" + line);
+        }
+    }
+
+    private void readData() throws IOException {
+        PropertiesParser parser;
+
+        if(binary) {
+            parser = (properties, entry) -> {
+                for (PropertyTemp property : properties) {
+                    readPropertyBinary(property, entry);
+                }
+            };
+        } else {
+            parser = (properties, entry) -> {
+                readLine();
+                String[] split = line.split("\\s+");
+
+                int numRead = 0;
+                for (PropertyTemp property : properties) {
+                    split = ArrayUtils.subarray(split, numRead, split.length);
+                    numRead = readPropertyASCII(split, property, entry);
+                }
+            };
+        }
+
+        for(ElementTemp e : elements) {
+            readElementData(e, parser);
+        }
+    }
+
+    private void readElementData(ElementTemp e, PropertiesParser parser) throws IOException {
+        for(int i = 0; i < e.numberOfEntries; i++) {
+            parser.readProperties(e.properties, i);
+        }
+
+        e.properties.parallelStream().filter(p -> p.total >= 0).forEach(p -> {
+            p.listBuffer = ByteBuffer
+                    .allocate(p.total * p.listType.numberOfBytes)
+                    .order(byteOrder);
+
+            for(ByteBuffer b : p.listBuffers) {
+                b.rewind();
+                p.listBuffer.put(b);
+            }
+
+            p.listBuffer.rewind();
+            p.listType.setByteOrder(p.listBuffer, ByteOrder.BIG_ENDIAN);
+        });
+
+        e.properties.parallelStream().forEach(p -> {
+            p.valueBuffer.rewind();
+            p.valueType.setByteOrder(p.valueBuffer, ByteOrder.BIG_ENDIAN);
+        });
+    }
+
+    private void readPropertyBinary(PropertyTemp property, int entry) throws IOException {
+        int numRead = 0;
+        property.valueBuffer.mark();
+        property.valueBuffer.limit(property.valueBuffer.position() +
+                property.valueType.numberOfBytes);
+
+        while(property.valueBuffer.hasRemaining() && numRead >= 0) {
+            numRead = channel.read(property.valueBuffer);
+        }
+        if(property.valueBuffer.hasRemaining()) {
+            throw new IllegalArgumentException("Could not read required number of bytes");
+        }
+
+        if(property.total < 0) {
+            return;
+        }
+
+        property.valueBuffer.reset();
+        int numberOfValues = property.valueType.parseInt(property.valueBuffer);
+        property.valueBuffer.position(property.valueBuffer.limit());
+        if(numberOfValues < 0) {
+            throw new IllegalArgumentException("Value count cannot be smaller than 0");
+        }
+
+        int bytesToRead             = property.listType.numberOfBytes * numberOfValues;
+        property.listBuffers[entry] = ByteBuffer.allocate(bytesToRead).order(byteOrder);
+
+        numRead = 0;
+
+        while(property.listBuffers[entry].hasRemaining() && numRead >= 0) {
+            numRead = channel.read(property.listBuffers[entry]);
+        }
+        if(property.listBuffers[entry].hasRemaining()) {
+            throw new IllegalArgumentException("Could not read required number of bytes");
+        }
+
+        property.total += numberOfValues;
+    }
+
+    private int readPropertyASCII(String[] split, PropertyTemp property,
+                                  int entry) throws IOException {
+        if(split.length <= 0) {
+            throw new IllegalArgumentException("Not enough values in line");
+        }
+        ByteBuffer val = property.valueType.parseValue(byteOrder, split[0]);
+        property.valueBuffer.put(val);
+
+        if(property.total < 0) {
+            return 1;
+        }
+
+        val.rewind();
+        int numberOfValues = property.valueType.parseInt(val);
+        if(numberOfValues < 0) {
+            throw new IllegalArgumentException("Value count cannot be smaller than 0");
+        }
+
+        if(numberOfValues > split.length - 1) {
+            throw new IllegalArgumentException("Not enough values in line");
+        }
+
+        int bytesToRead             = property.listType.numberOfBytes * numberOfValues;
+        property.listBuffers[entry] = ByteBuffer.allocate(bytesToRead);
+
+        for(int i = 1; i <= numberOfValues; i++) {
+            property.listType.parseValue(property.listBuffers[entry], split[i]);
+        }
+
+        property.total += numberOfValues;
+        return numberOfValues + 1;
+    }
+
+    private interface PropertiesParser {
+        void readProperties(List<PropertyTemp> properties, int entry) throws IOException;
+    }
+
+    private static class ElementTemp {
+        String              name;
+        int                 numberOfEntries;
+        List<PropertyTemp>  properties;
+
+        ElementTemp(String name, int numberOfEntries, List<PropertyTemp> properties) {
+            this.name = name;
+            this.numberOfEntries = numberOfEntries;
+            this.properties = properties;
+        }
+    }
+
+    private static class PropertyTemp {
+        String              name;
+        PropertyType        valueType;
+        ByteBuffer          valueBuffer;
+        PropertyType        listType;
+        ByteBuffer[]        listBuffers;
+        int                 total;
+        ByteBuffer          listBuffer;
+
+        PropertyTemp(String name, PropertyType valueType,
+                            ByteBuffer valueBuffer, PropertyType listType,
+                            ByteBuffer[] listBuffers, int total) {
+            this.name = name;
+            this.valueType = valueType;
+            this.valueBuffer = valueBuffer;
+            this.listType = listType;
+            this.listBuffers = listBuffers;
+            this.total = total;
         }
     }
 }

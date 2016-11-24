@@ -1,54 +1,89 @@
 package nl.ramondevaan.visualization.mesh;
 
-import nl.ramondevaan.visualization.utilities.DataUtils;
-
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.PrintWriter;
-import java.nio.FloatBuffer;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.util.Locale;
+import java.nio.channels.FileLock;
+import java.util.ArrayList;
+import java.util.List;
 
 public class OFFWriter extends MeshWriter {
+    private final static byte[] LINE_SEP    = System.lineSeparator().getBytes();
+
+    private FileOutputStream stream;
+
     @Override
-    protected void write(Mesh mesh) throws FileNotFoundException {
-        PrintWriter pw = new PrintWriter(new FileOutputStream(file, false));
-    
-        pw.println("OFF");
-        pw.print(String.valueOf(mesh.numberOfCoordinates));
-        pw.print(" ");
-        pw.print(String.valueOf(mesh.numberOfFaces));
-        pw.println(" 0");
-    
-        FloatBuffer cBuf = mesh.coordinatesRead;
-        cBuf.rewind();
-        
-        while(cBuf.hasRemaining()) {
-            pw.print(DataUtils.NUMBER_FORMAT.format(cBuf.get()));
-            pw.print(' ');
-            pw.print(DataUtils.NUMBER_FORMAT.format(cBuf.get()));
-            pw.print(' ');
-            pw.println(DataUtils.NUMBER_FORMAT.format(cBuf.get()));
+    protected void write(Mesh mesh) throws IOException {
+        if(mesh.dimensionality != 3) {
+            throw new UnsupportedOperationException("OFF writer (currently) only supports meshes of dimensionality 3");
         }
-    
-        IntBuffer fBuf = mesh.facesRead;
-        fBuf.rewind();
-        
-        int n, i;
-        while(fBuf.hasRemaining()) {
-            n = fBuf.get();
-            pw.print(String.valueOf(n));
-            pw.print(' ');
-            for(i = 0; i < n - 1; i++) {
-                pw.print(String.valueOf(fBuf.get()));
-                pw.print(' ');
+
+        stream  = new FileOutputStream(path, false);
+
+        FileLock lock = stream.getChannel().tryLock(0, Long.MAX_VALUE, false);
+
+        if(lock == null) {
+            throw new IllegalArgumentException("Could not lock file");
+        }
+
+        writeLine("OFF");
+        writeLine(String.join(" ",
+                String.valueOf(mesh.numberOfVertices),
+                String.valueOf(mesh.numberOfFaces),
+                String.valueOf(0)
+        ));
+        printVertices(mesh);
+        printFaces(mesh);
+
+
+        stream.close();
+    }
+
+    private void writeLine(String s) throws IOException {
+        stream.write(s.getBytes());
+        stream.write(LINE_SEP);
+    }
+
+    private void printVertices(Mesh mesh) throws IOException {
+        IntBuffer coordInds = mesh.getCoordinatePropertyIndices();
+
+        List<PropertyType> coordTypes   = new ArrayList<>();
+        List<ByteBuffer> coordBufs      = new ArrayList<>();
+        while(coordInds.hasRemaining()) {
+            Property c = mesh.vertexElement.properties.get(coordInds.get());
+            coordTypes.add(c.type);
+            coordBufs.add(c.getValues());
+        }
+
+        for(int entry = 0; entry < mesh.numberOfVertices; entry++) {
+            List<String> line = new ArrayList<>();
+            for (int i = 0; i < coordBufs.size(); i++) {
+                int next = coordBufs.get(i).position() + coordTypes.get(i).numberOfBytes;
+                coordBufs.get(i).limit(next);
+                line.add(coordTypes.get(i).toString(coordBufs.get(i)));
+                coordBufs.get(i).position(next);
             }
-            pw.println(String.valueOf(fBuf.get()));
+            writeLine(String.join(" ", line));
         }
-    
-        pw.close();
+    }
+
+    private void printFaces(Mesh mesh) throws IOException {
+        IntBuffer countBuf      = mesh.getNumVerticesInFaces();
+        IntBuffer verticesBuf   = mesh.getVerticesInFaces();
+
+        while(countBuf.hasRemaining()) {
+            List<String> line = new ArrayList<>();
+
+            int num = countBuf.get();
+
+            line.add(String.valueOf(num));
+
+            for(int i = 0; i < num; i++) {
+                line.add(String.valueOf(verticesBuf.get()));
+            }
+
+            writeLine(String.join(" ", line));
+        }
     }
 }
