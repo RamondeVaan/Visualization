@@ -103,26 +103,26 @@ public class PLYReader extends MeshReader {
     private void initRead() throws IOException {
         lineSeparator = "";
 
-        String s = "";
-        for(int i = 0; i < 3; i++) {
-            s += (char) stream.read();
+        line = "";
+        char c = (char) stream.read();
+        while(c != LF && c != CR) {
+            line += c;
+            c = (char) stream.read();
         }
 
-        if(!s.equals("ply")) {
+        line = line.trim();
+        if(!line.equals("ply")) {
             throw new IOException("PLY file was of incorrect format");
         }
 
-        char c = (char) stream.read();
-        if(c == LF) {
-            lineSeparator += LF;
-        } else if (c == CR) {
-            char n = (char) stream.read();
-            lineSeparator += CR;
+        lineSeparator += c;
 
-            if(n == LF) {
+        if(c != LF) {
+            c = (char) stream.read();
+            if (c == LF) {
                 lineSeparator += LF;
             } else {
-                tempLine = String.valueOf(n);
+                tempLine = String.valueOf(c);
             }
         }
         readLine();
@@ -153,8 +153,7 @@ public class PLYReader extends MeshReader {
     private void readLine() throws IOException {
         do {
             readLineImpl();
-        } while(line != null && !line.isEmpty() &&
-                line.toLowerCase().trim().startsWith("comment"));
+        } while(line != null && line.toLowerCase().trim().startsWith("comment"));
     }
 
     private void readLineImpl() throws IOException {

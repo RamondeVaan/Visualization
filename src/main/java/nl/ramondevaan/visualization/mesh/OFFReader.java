@@ -3,6 +3,7 @@ package nl.ramondevaan.visualization.mesh;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 import java.nio.channels.FileLock;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -63,14 +64,14 @@ public class OFFReader extends MeshReader {
     private void resetVariables() {
         numberOfVertices    = 0;
         numberOfFaces       = 0;
+        line                = "";
         tempLine            = "";
     }
 
     private void readLine() throws IOException {
         do {
             readLineImpl();
-        } while(line != null && line.isEmpty() &&
-                line.toLowerCase().startsWith("#"));
+        } while(line != null && line.toLowerCase().startsWith("#"));
     }
 
     private void readLineImpl() throws IOException {
@@ -92,26 +93,26 @@ public class OFFReader extends MeshReader {
     private void initRead() throws IOException {
         lineSeparator = "";
 
-        String s = "";
-        for(int i = 0; i < 3; i++) {
-            s += (char) stream.read();
+        line = "";
+        char c = (char) stream.read();
+        while(c != LF && c != CR) {
+            line += c;
+            c = (char) stream.read();
         }
 
-        if(!s.equals("OFF")) {
+        line = line.trim();
+        if(!line.equals("OFF")) {
             throw new IOException("OFF file was of incorrect format");
         }
 
-        char c = (char) stream.read();
-        if(c == LF) {
-            lineSeparator += LF;
-        } else if (c == CR) {
-            char n = (char) stream.read();
-            lineSeparator += CR;
+        lineSeparator += c;
 
-            if(n == LF) {
+        if(c != LF) {
+            c = (char) stream.read();
+            if (c == LF) {
                 lineSeparator += LF;
             } else {
-                tempLine = String.valueOf(n);
+                tempLine = String.valueOf(c);
             }
         }
         readLine();

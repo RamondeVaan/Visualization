@@ -10,7 +10,6 @@ import java.nio.ByteBuffer;
 import java.nio.DoubleBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -107,16 +106,17 @@ public class ImageExtend extends Filter<Image, Image> {
             extensionUsed.put(0);
         }
         extension.limit(extension.capacity());
-        
-        Image output = constructOutput(input, extensionUsed);
-        setZeros(input, output, extensionUsed);
-        setValues(input, output, extensionUsed);
-        output.values = output.values.asReadOnlyBuffer();
+
+        ImmutablePair<Image, ByteBuffer> pair = constructOutput(input, extensionUsed);
+        Image       output = pair.left;
+        ByteBuffer  buffer = pair.right;
+        setZeros(input, output, buffer, extensionUsed);
+        setValues(input, output, buffer, extensionUsed);
         
         return output;
     }
     
-    private Image constructOutput(Image input, IntBuffer extensionUsed) {
+    private ImmutablePair<Image, ByteBuffer> constructOutput(Image input, IntBuffer extensionUsed) {
         final int   dimensionality = input.dimensionality;
         double      orig;
         double      spacing;
@@ -182,29 +182,27 @@ public class ImageExtend extends Filter<Image, Image> {
         //Rewind buffers
         dimensions  .rewind();
         origin      .rewind();
-        values      .rewind();
         newExtent   .rewind();
         newBounds   .rewind();
         
         //Return new image
-        return new Image(
+        return new ImmutablePair<>(new Image(
                 input       .componentType,
                 input       .pixelType,
-                input       .byteOrder,
                 input       .dataDimensionality,
                 dimensions  .asReadOnlyBuffer(),
                 input       .getSpacing(),
                 input       .getPixelSize(),
                 origin      .asReadOnlyBuffer(),
                 input       .getTransformMatrix(),
-                values,
+                values.asReadOnlyBuffer(),
                 newExtent   .asReadOnlyBuffer(),
                 newBounds   .asReadOnlyBuffer(),
                 Collections .unmodifiableList(extraProperties)
-        );
+        ), values);
     }
     
-    private void setZeros(Image input, Image output, IntBuffer extensionUsed) {
+    private void setZeros(Image input, Image output, ByteBuffer buffer, IntBuffer extensionUsed) {
         final int dataLen = input.componentType.numberOfBytes * input.dataDimensionality;
     
         IntBuffer inputDimensions   = input.getDimensions();
@@ -261,7 +259,8 @@ public class ImageExtend extends Filter<Image, Image> {
                 other[1] = region[a1] - 1;
             }
             
-            ImageRegionIterator it = new ImageRegionIterator(output, region);
+            ImageRegionIterator it = new ImageRegionIterator(buffer, output.componentType,
+                    output.getDimensions(), output.dataDimensionality, region);
             while(it.hasNext()) {
                 it.next().put(fillValueUsed);
                 fillValueUsed.rewind();
@@ -272,7 +271,7 @@ public class ImageExtend extends Filter<Image, Image> {
         }
     }
     
-    private void setValues(Image input, Image output, IntBuffer extensionUsed) {
+    private void setValues(Image input, Image output, ByteBuffer buffer, IntBuffer extensionUsed) {
         int[] inRegion  = new int[input.dimensionality * 2];
         int[] outRegion = new int[input.dimensionality * 2];
     
@@ -294,7 +293,8 @@ public class ImageExtend extends Filter<Image, Image> {
             }
         }
         ImageRegionIterator in = new ImageRegionIterator(input, inRegion);
-        ImageRegionIterator out = new ImageRegionIterator(output, outRegion);
+        ImageRegionIterator out = new ImageRegionIterator(buffer, output.componentType,
+                output.getDimensions(), output.dataDimensionality, outRegion);
         
         while(in.hasNext()) {
             out.next().put(in.next());

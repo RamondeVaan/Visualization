@@ -30,9 +30,9 @@ public enum PropertyType {
         switch(this) {
             case CHAR:
             case UCHAR: {
-                CharBuffer orig = buffer.asCharBuffer();
+                ByteBuffer orig = buffer.duplicate().order(buffer.order());
                 buffer.order(order);
-                orig.put(buffer.asCharBuffer());
+                orig.put(buffer.duplicate().order(order));
                 break;
             }
             case SHORT:
@@ -78,7 +78,7 @@ public enum PropertyType {
         switch(this) {
             case CHAR:
             case UCHAR:
-                ret.asCharBuffer().put(cpy.asCharBuffer());
+                ret.put(cpy);
                 break;
             case SHORT:
             case USHORT:

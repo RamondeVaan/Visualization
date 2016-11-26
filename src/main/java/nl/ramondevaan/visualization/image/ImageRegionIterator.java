@@ -1,5 +1,8 @@
 package nl.ramondevaan.visualization.image;
 
+import nl.ramondevaan.visualization.data.ComponentType;
+import org.apache.commons.lang3.Validate;
+
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.Iterator;
@@ -15,7 +18,74 @@ public class ImageRegionIterator implements Iterator<ByteBuffer> {
     private final ByteBuffer    values;
     
     private int                 curDim;
-    
+
+    public ImageRegionIterator(ByteBuffer buffer, ComponentType componentType,
+                                IntBuffer dimensions, int dataDimensionality,
+                                int[] region) {
+        Validate.notNull(buffer);
+        Validate.notNull(componentType);
+        Validate.notNull(dimensions);
+        Validate.notNull(region);
+        if(dataDimensionality < 1) {
+            throw new IllegalArgumentException("Data dimensionality must be at least 1");
+        }
+
+        this.dimensionality = dimensions.capacity();
+        final int dmin1 = this.dimensionality - 1;
+        this.dimensions     = dimensions.duplicate();
+
+        if(region.length != dimensionality * 2) {
+            throw new IllegalArgumentException("Region dimensionality did not match image dimensionality");
+        }
+        this.min    = new int[dimensionality];
+        this.max    = new int[dimensionality];
+        this.cur    = new int[dimensionality];
+        this.skip   = new int[dimensionality];
+
+        int numberOfBytes = componentType.numberOfBytes * dataDimensionality;
+        this.dimensions.rewind();
+        int dim;
+        for(int i = 0; i < dimensionality; i++) {
+            dim = this.dimensions.get();
+            if(region[2 * i] > region[2 * i + 1]) {
+                min[i] = region[2 * i + 1];
+                max[i] = region[2 * i];
+            } else {
+                min[i] = region[2 * i];
+                max[i] = region[2 * i + 1];
+            }
+            if(min[i] < 0 || max[i] >= dim) {
+                throw new IllegalArgumentException("Region was out of bounds");
+            }
+            numberOfBytes *= dim;
+        }
+
+        System.arraycopy(min, 0, cur, 0, dimensionality);
+        valueLength = componentType.numberOfBytes * dataDimensionality;
+        int num;
+        skip[0] = valueLength;
+        for(int i = 0; i < dmin1; i++) {
+            num = 1;
+            for(int j = 0; j < i; j++) {
+                num *= this.dimensions.get(j);
+            }
+            skip[i + 1] = (min[i] + this.dimensions.get(i) - max[i] - 1) * num * valueLength;
+        }
+        for(int i = 1; i < skip.length; i++) {
+            skip[i] += skip[i - 1];
+        }
+
+        if(buffer.remaining() == numberOfBytes) {
+            values = buffer.slice();
+        } else if(buffer.capacity() == numberOfBytes) {
+            values = buffer.duplicate();
+        } else {
+            throw new IllegalArgumentException("Buffer length was not consistent with given dimensions");
+        }
+        values.position(locAtPos(min));
+        curDim = 0;
+    }
+
     public ImageRegionIterator(Image image, int[] region) {
         this.dimensionality = image.dimensionality;
         final int dmin1 = this.dimensionality - 1;
@@ -61,7 +131,7 @@ public class ImageRegionIterator implements Iterator<ByteBuffer> {
         values.position(locAtPos(min));
         curDim = 0;
     }
-    
+
     private int locAtPos(int[] pos) {
         int ret = 0;
         int num = 1;

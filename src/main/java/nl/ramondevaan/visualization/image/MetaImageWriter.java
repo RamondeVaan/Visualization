@@ -2,40 +2,83 @@ package nl.ramondevaan.visualization.image;
 
 import nl.ramondevaan.visualization.utilities.DataUtils;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.*;
+import java.nio.channels.FileLock;
 import java.util.Iterator;
 
 import static nl.ramondevaan.visualization.utilities.MetaImageUtilities.*;
 
 public class MetaImageWriter extends ImageWriter {
-    private FileOutputStream stream;
-    private String rawPath;
-    private boolean local;
-    private boolean hideElementDataFile;
-    private boolean skipBinary;
-    
+    private FileOutputStream    stream;
+    private String              rawPath;
+    private boolean             local;
+    private boolean             hideElementDataFile;
+    private boolean             skipBinary;
+    private ByteOrder           byteOrder;
+
+    public MetaImageWriter() {
+        this.byteOrder = ByteOrder.BIG_ENDIAN;
+    }
+
+    public final String getRawPath() {
+        return rawPath;
+    }
+
+    public final boolean isLocal() {
+        return local;
+    }
+
+    public final boolean isHideElementDataFile() {
+        return hideElementDataFile;
+    }
+
+    public final boolean isSkipBinary() {
+        return skipBinary;
+    }
+
+    public final ByteOrder getByteOrder() {
+        return byteOrder;
+    }
+
     public final void setLocal(boolean local) {
-        this.local = local;
-        changed();
+        if(local != this.local) {
+            this.local = local;
+            changed();
+        }
     }
     
     public final void setHideElementDataFile(boolean hideElementDataFile) {
-        this.hideElementDataFile = hideElementDataFile;
-        changed();
+        if(hideElementDataFile != this.hideElementDataFile) {
+            this.hideElementDataFile = hideElementDataFile;
+            changed();
+        }
     }
     
     public final void setRawPath(String rawPath) {
-        this.rawPath = rawPath;
-        changed();
+        if(!FilenameUtils.equalsNormalizedOnSystem(this.rawPath, rawPath)) {
+            this.rawPath = rawPath;
+            changed();
+        }
     }
     
     public final void setSkipBinary(boolean skipBinary) {
-        this.skipBinary = skipBinary;
-        changed();
+        if(skipBinary != this.skipBinary) {
+            this.skipBinary = skipBinary;
+            changed();
+        }
+    }
+
+    public final void setByteOrder(ByteOrder byteOrder) {
+        Validate.notNull(byteOrder);
+        if(byteOrder != this.byteOrder) {
+            this.byteOrder = byteOrder;
+            changed();
+        }
     }
     
     @Override
@@ -48,11 +91,16 @@ public class MetaImageWriter extends ImageWriter {
             tmpRawPath = FilenameUtils.getBaseName(path) + ".raw";
         }
         stream = new FileOutputStream(file);
+
+        FileLock lock = stream.getChannel().tryLock();
+        if(lock == null) {
+            throw new IOException("Could not lock \"" + path + "\".");
+        }
         
         printProperty(OBJECT_TYPE,                  IMAGE);
         printProperty(N_DIMS,                       image.dimensionality);
         printProperty(BINARY_DATA,                  true);
-        printProperty(BINARYDATA_BYTEORDER_MSB,     image.byteOrder == ByteOrder.BIG_ENDIAN);
+        printProperty(BINARYDATA_BYTEORDER_MSB,     byteOrder == ByteOrder.BIG_ENDIAN);
         printProperty(COMPRESSED_DATA,              false);
         printProperty(TRANSFORM_MATRIX,             image.getTransformMatrix());
         printProperty(ORIGIN,                       image.getOrigin());
@@ -77,10 +125,20 @@ public class MetaImageWriter extends ImageWriter {
     
             stream = new FileOutputStream(FilenameUtils.concat(
                     FilenameUtils.getFullPath(path), tmpRawPath));
+
+            lock = stream.getChannel().tryLock();
+            if(lock == null) {
+                throw new IOException("Could not lock \"" + path + "\".");
+            }
         } else {
             printProperty(ELEMENT_DATAFILE, LOCAL);
         }
-        stream.getChannel().write(image.getValues());
+
+        ByteBuffer buffer = DataUtils.clone(image.getValues());
+        buffer.rewind();
+        image.componentType.setByteOrder(buffer, byteOrder);
+
+        stream.getChannel().write(buffer);
         stream.close();
     }
     

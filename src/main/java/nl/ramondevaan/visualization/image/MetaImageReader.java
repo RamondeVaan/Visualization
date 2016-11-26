@@ -7,17 +7,20 @@ import nl.ramondevaan.visualization.utilities.MetaImageUtilities;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
-import java.io.*;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
 import java.nio.IntBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
-//TODO: FileChannel instead of inputstream?
-//TODO: Check endianness correct (duplicating and readonly switch to big endian)
 public class MetaImageReader extends ImageReader {
     private final static char LF = 10;
     private final static char CR = 13;
@@ -37,23 +40,29 @@ public class MetaImageReader extends ImageReader {
     private int                                 headerSize;
     private String                              dataFile;
     private List<ImmutablePair<String, String>> otherProperties;
-    
-    private InputStream stream;
-    private String line;
-    private String key;
-    private String value;
-    private int curChar;
-    
-    public MetaImageReader() {
-        otherProperties = new ArrayList<>();
-    }
+
+    private String              lineSeparator;
+    private FileInputStream     stream;
+    private FileChannel         channel;
+    private String              tempLine;
+    private String              line;
     
     @Override
     protected Image read() throws IOException {
         resetProperties();
-        do {
+
+        stream = new FileInputStream(file);
+        channel = stream.getChannel();
+
+        FileLock lock = channel.tryLock(0, Long.MAX_VALUE, true);
+        if(lock == null) {
+            throw new IOException("Could not lock \"" + path + "\".");
+        }
+
+        initRead();
+        while(parseProperty()) {
             readLine();
-        } while(parseProperty());
+        }
         
         if(dimensionality <= 0) {
            throw new IllegalArgumentException("No dimensionality was provided");
@@ -103,7 +112,13 @@ public class MetaImageReader extends ImageReader {
                 dataFile = FilenameUtils.removeExtension(path) + ".raw";
             }
             stream.close();
-            stream = new BufferedInputStream(new FileInputStream(dataFile));
+            stream = new FileInputStream(dataFile);
+            channel = stream.getChannel();
+
+            lock = channel.tryLock(0, Long.MAX_VALUE, true);
+            if(lock == null) {
+                throw new IOException("Could not lock \"" + path + "\".");
+            }
         }
         readBinary();
         stream.close();
@@ -145,7 +160,6 @@ public class MetaImageReader extends ImageReader {
         return new Image(
                 componentType,
                 pixelType,
-                byteOrder,
                 numberOfChannels,
                 dimensions,
                 spacing,
@@ -155,13 +169,12 @@ public class MetaImageReader extends ImageReader {
                 bytes,
                 extent,
                 bounds,
-                otherProperties
+                Collections.unmodifiableList(otherProperties)
         );
     }
     
     private void resetProperties() throws FileNotFoundException {
-        otherProperties.clear();
-        
+        otherProperties     = new ArrayList<>();
         dimensionality      = -1;
         numberOfChannels    = 1;
         headerSize          = 0;
@@ -176,112 +189,131 @@ public class MetaImageReader extends ImageReader {
         local               = false;
         pixelType           = PixelType.SCALAR;
         
-        line = null;
-        key = null;
-        value = null;
-        stream = new BufferedInputStream(new FileInputStream(file));
+        line        = "";
+        tempLine    = "";
+    }
+
+    private void initRead() throws IOException {
+        lineSeparator = "";
+
+        line = "";
+        char c = (char) stream.read();
+        while(c != LF && c != CR) {
+            line += c;
+            c = (char) stream.read();
+        }
+
+        line = line.trim();
+        lineSeparator += c;
+
+        if(c == LF) {
+            return;
+        }
+
+        c = (char) stream.read();
+        if(c == LF) {
+            lineSeparator += LF;
+        } else {
+            tempLine = String.valueOf(c);
+        }
     }
 
     private void readLine() throws IOException {
         line = "";
-        curChar = stream.read();
-        while(curChar != -1 && curChar != LF && curChar != CR) {
-            line += ((char) curChar);
-            curChar = stream.read();
-        }
-        if(curChar == CR) {
-            stream.mark(1);
-            curChar = stream.read();
-            if(curChar != LF) {
-                stream.reset();
-            }
-        }
+        int curChar;
 
-        line = line.trim();
-        if(line.isEmpty()) {
-            key     = null;
-            value   = null;
-            return;
-        }
-        String[] split = line.split("=");
-        if(split.length != 2) {
-            throw new IOException("Could not parse property from:"
-                    + System.lineSeparator() + line);
-        }
-        key = split[0].trim();
-        value = split[1].trim();
+        do {
+            curChar = stream.read();
+            if(curChar == -1) {
+                break;
+            }
+            tempLine += (char) curChar;
+        } while(!tempLine.endsWith(lineSeparator));
+
+        line = tempLine.trim();
+        tempLine = "";
     }
 
     private boolean parseProperty() {
-        if(key != null) {
-            switch (key) {
-                case MetaImageUtilities.OBJECT_TYPE:
-                    if (!value.equalsIgnoreCase(MetaImageUtilities.IMAGE)) {
-                        throw new IllegalArgumentException("MHD did not contain an image");
-                    }
-                    break;
-                case MetaImageUtilities.N_DIMS:
-                    dimensionality = Integer.parseInt(value);
-                    if (dimensionality <= 0) {
-                        throw new IllegalArgumentException("Number of dimensions may not be smaller than 1");
-                    }
-                    break;
-                case MetaImageUtilities.DIM_SIZE:
-                    parseDimSize(value);
-                    break;
-                case MetaImageUtilities.ELEMENT_SIZE:
-                    parseElementSize(value);
-                    break;
-                case MetaImageUtilities.ELEMENT_SPACING:
-                    parseElementSpacing(value);
-                    break;
-                case MetaImageUtilities.BINARY_DATA:
-                    if (!Boolean.parseBoolean(value)) {
-                        throw new UnsupportedOperationException("Currently, only binary data is supported");
-                    }
-                    break;
-                case MetaImageUtilities.COMPRESSED_DATA:
-                    if (Boolean.parseBoolean(value)) {
-                        throw new UnsupportedOperationException("Compressed data is not (yet) supported");
-                    }
-                    break;
-                case MetaImageUtilities.ORIGIN:
-                    parseOrigin(value);
-                    break;
-                case MetaImageUtilities.ELEMENT_TYPE:
-                    componentType = ComponentType.valueOf(value);
-                    break;
-                case MetaImageUtilities.TRANSFORM_MATRIX:
-                    parseTransformMatrix(value);
-                    break;
-                case MetaImageUtilities.ELEMENT_NUMBER_OF_CHANNELS:
-                    int i = Integer.parseInt(value);
-                    if (i < 1) {
-                        throw new IllegalArgumentException("ElementNumberOfChannels " +
-                                "must be greater than or equal to 1");
-                    }
-                    numberOfChannels = i;
-                    break;
-                case MetaImageUtilities.HEADER_SIZE:
-                    headerSize = Integer.parseInt(value);
-                    break;
-                case MetaImageUtilities.ELEMENT_DATAFILE:
-                    parseDataFile(value);
-                    return false;
-                case MetaImageUtilities.BINARYDATA_BYTEORDER_MSB:
-                case MetaImageUtilities.ELEMENT_BYTEORDER_MSB:
-                    byteOrder = Boolean.parseBoolean(value) ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN;
-                    break;
-                case MetaImageUtilities.CENTER_OF_ROTATION:
-                case MetaImageUtilities.ANATOMICAL_ORIENTATION:
-                    addOtherProperty(key, value);
-                    break;
-                default:
-                    throw new UnsupportedOperationException("Unexpected key: \"" + key + "\"");
-            }
+        if(line == null || line.isEmpty()) {
+            return false;
         }
 
-        return curChar != -1;
+        String[] split = line.split("=");
+        if(split.length != 2) {
+            throw new IllegalArgumentException("Could not parse property from:"
+                    + System.lineSeparator() + line);
+        }
+        String key      = split[0].trim();
+        String value    = split[1].trim();
+
+        switch (key) {
+            case MetaImageUtilities.OBJECT_TYPE:
+                if (!value.equalsIgnoreCase(MetaImageUtilities.IMAGE)) {
+                    throw new IllegalArgumentException("MHD did not contain an image");
+                }
+                break;
+            case MetaImageUtilities.N_DIMS:
+                dimensionality = Integer.parseInt(value);
+                if (dimensionality <= 0) {
+                    throw new IllegalArgumentException("Number of dimensions may not be smaller than 1");
+                }
+                break;
+            case MetaImageUtilities.DIM_SIZE:
+                parseDimSize(value);
+                break;
+            case MetaImageUtilities.ELEMENT_SIZE:
+                parseElementSize(value);
+                break;
+            case MetaImageUtilities.ELEMENT_SPACING:
+                parseElementSpacing(value);
+                break;
+            case MetaImageUtilities.BINARY_DATA:
+                if (!Boolean.parseBoolean(value)) {
+                    throw new UnsupportedOperationException("Currently, only binary data is supported");
+                }
+                break;
+            case MetaImageUtilities.COMPRESSED_DATA:
+                if (Boolean.parseBoolean(value)) {
+                    throw new UnsupportedOperationException("Compressed data is not (yet) supported");
+                }
+                break;
+            case MetaImageUtilities.ORIGIN:
+                parseOrigin(value);
+                break;
+            case MetaImageUtilities.ELEMENT_TYPE:
+                componentType = ComponentType.valueOf(value);
+                break;
+            case MetaImageUtilities.TRANSFORM_MATRIX:
+                parseTransformMatrix(value);
+                break;
+            case MetaImageUtilities.ELEMENT_NUMBER_OF_CHANNELS:
+                int i = Integer.parseInt(value);
+                if (i < 1) {
+                    throw new IllegalArgumentException("ElementNumberOfChannels " +
+                            "must be greater than or equal to 1");
+                }
+                numberOfChannels = i;
+                break;
+            case MetaImageUtilities.HEADER_SIZE:
+                headerSize = Integer.parseInt(value);
+                break;
+            case MetaImageUtilities.ELEMENT_DATAFILE:
+                parseDataFile(value);
+                return false;
+            case MetaImageUtilities.BINARYDATA_BYTEORDER_MSB:
+            case MetaImageUtilities.ELEMENT_BYTEORDER_MSB:
+                byteOrder = Boolean.parseBoolean(value) ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN;
+                break;
+            case MetaImageUtilities.CENTER_OF_ROTATION:
+            case MetaImageUtilities.ANATOMICAL_ORIENTATION:
+                addOtherProperty(key, value);
+                break;
+            default:
+                throw new UnsupportedOperationException("Unexpected key: \"" + key + "\"");
+        }
+
+        return true;
     }
     
     private void parseDimSize(String value) {
@@ -348,11 +380,13 @@ public class MetaImageReader extends ImageReader {
     }
     
     private void parseDataFile(String value) {
-        if(value.matches("LIST[\\s+\\d+D]")) {
+        if(value.matches("LIST(\\s+\\d+D)?")) {
             throw new UnsupportedOperationException("Lists of filenames is currently not supported");
         } else if(value.matches(MetaImageUtilities.LOCAL)) {
             local = true;
             return;
+        } else if(value.matches(".+(\\s+\\d+){3}")) {
+            throw new IllegalArgumentException("c-style printf strings are currently not supported");
         }
         String ext = FilenameUtils.getExtension(value);
         if(!ext.equalsIgnoreCase("raw")) {
@@ -375,15 +409,17 @@ public class MetaImageReader extends ImageReader {
         num *= componentType.numberOfBytes * numberOfChannels;
         
         bytes = ByteBuffer.allocate(num).order(byteOrder);
-        byte[] internal = bytes.array();
-        if(headerSize > 0) {
-            if(headerSize != stream.skip(headerSize)) {
-                throw new IOException("Error skipping over required number of bytes");
-            }
+        channel.position(channel.position() + headerSize);
+
+        int numRead = 0;
+        while(bytes.hasRemaining() && numRead >= 0) {
+            numRead = channel.read(bytes);
         }
-        int k = stream.read(internal, 0, num);
-        if(k < num) {
+        if(bytes.hasRemaining()) {
             throw new IOException("Could not read required number of bytes");
         }
+
+        bytes.rewind();
+        componentType.setByteOrder(bytes, ByteOrder.BIG_ENDIAN);
     }
 }

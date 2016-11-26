@@ -17,24 +17,21 @@ public class Image {
     public final List<ImmutablePair<String, String>>    extraProperties;
     public final int                                    dataDimensionality;
     public final int                                    dimensionality;
-    public final ByteOrder                              byteOrder;
     final IntBuffer                                     dimensions;
     final DoubleBuffer                                  spacing;
     final DoubleBuffer                                  pixelSize;
     final DoubleBuffer                                  origin;
     final DoubleBuffer                                  transformMatrix;
-    ByteBuffer                                          values;
+    final ByteBuffer                                    values;
     final IntBuffer                                     extent;
     final DoubleBuffer                                  bounds;
 
-    public Image(ComponentType componentType,   PixelType pixelType,    ByteOrder byteOrder,
-                 int dataDimensionality,        int[] dimensions,       double[] spacing,
-                 double[] pixelSize,            double[] origin,        double[] transformMatrix,
-                 byte[] values) {
+    public Image(ComponentType componentType, PixelType pixelType, int dataDimensionality,
+                 int[] dimensions, double[] spacing, double[] pixelSize,
+                 double[] origin, double[] transformMatrix, byte[] values) {
         this(
                 componentType,
                 pixelType,
-                byteOrder,
                 dataDimensionality,
                 dimensions,
                 spacing,
@@ -46,10 +43,10 @@ public class Image {
         );
     }
 
-    public Image(ComponentType componentType, PixelType pixelType, ByteOrder byteOrder,
-                 int dataDimensionality, int[] dimensions, double[] spacing,
-                 double[] pixelSize, double[] origin, double[] transformMatrix,
-                 byte[] values, List<ImmutablePair<String, String>> extraProperties) {
+    public Image(ComponentType componentType, PixelType pixelType, int dataDimensionality,
+                 int[] dimensions, double[] spacing, double[] pixelSize,
+                 double[] origin, double[] transformMatrix, byte[] values,
+                 List<ImmutablePair<String, String>> extraProperties) {
         Validate.notNull(componentType);
         Validate.notNull(pixelType);
         Validate.notNull(dimensions);
@@ -61,7 +58,6 @@ public class Image {
         
         this.componentType  = componentType;
         this.pixelType      = pixelType;
-        this.byteOrder      = byteOrder;
         this.dimensionality = dimensions.length;
         if(dimensionality <= 0) {
             throw new IllegalArgumentException("Dimensionality must be at least 1");
@@ -148,14 +144,13 @@ public class Image {
         this.extraProperties    = Collections.unmodifiableList(extraProps);
     }
 
-    Image(ComponentType componentType, PixelType pixelType, ByteOrder byteOrder,
+    Image(ComponentType componentType, PixelType pixelType,
           int dataDimensionality, IntBuffer dimensions, DoubleBuffer spacing,
           DoubleBuffer pixelSize, DoubleBuffer origin, DoubleBuffer transformMatrix,
           ByteBuffer values, IntBuffer extent, DoubleBuffer bounds,
           List<ImmutablePair<String, String>> extraProps) {
         this.componentType      = componentType;
         this.pixelType          = pixelType;
-        this.byteOrder          = byteOrder;
         this.dimensionality     = dimensions.capacity();
         this.dataDimensionality = dataDimensionality;
         this.dimensions         = dimensions;
@@ -169,13 +164,12 @@ public class Image {
         this.extraProperties    = extraProps;
     }
 
-    Image(ComponentType componentType, PixelType pixelType, ByteOrder byteOrder,
+    Image(ComponentType componentType, PixelType pixelType,
           int dataDimensionality, IntBuffer dimensions, DoubleBuffer spacing,
           DoubleBuffer pixelSize, DoubleBuffer origin, DoubleBuffer transformMatrix,
           ByteBuffer values, IntBuffer extent, DoubleBuffer bounds) {
         this.componentType      = componentType;
         this.pixelType          = pixelType;
-        this.byteOrder          = byteOrder;
         this.dimensionality     = dimensions.capacity();
         this.dataDimensionality = dataDimensionality;
         this.dimensions         = dimensions;
