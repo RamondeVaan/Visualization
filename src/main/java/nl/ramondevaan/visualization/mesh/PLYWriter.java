@@ -42,7 +42,7 @@ public class PLYWriter extends MeshWriter {
         FileLock lock = channel.tryLock(0, Long.MAX_VALUE, false);
 
         if(lock == null) {
-            throw new IllegalArgumentException("Could not lock file");
+            throw new IOException("Could not lock \"" + path + "\".");
         }
 
         List<Element> elements = getElements(mesh);

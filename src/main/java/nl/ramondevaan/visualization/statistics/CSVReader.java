@@ -1,6 +1,7 @@
 package nl.ramondevaan.visualization.statistics;
 
 import java.io.*;
+import java.nio.channels.FileLock;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,16 +9,16 @@ public class CSVReader extends ValueMatrixReader {
     public static final String DEFAULT_COLSEP = ",";
     public static final String DEFAULT_ROWSEP = System.lineSeparator();
 
-    private String colSep;
-    private String rowSep;
+    private String  colSep;
+    private String  rowSep;
     private boolean quoted;
 
-    private BufferedInputStream stream;
-    private String line;
-    private int curChar;
-    private String[] headers;
-    private List<String> valuesList;
-    private String[] values;
+    private FileInputStream stream;
+    private String          line;
+    private int             curChar;
+    private String[]        headers;
+    private List<String>    valuesList;
+    private String[]        values;
 
     public CSVReader() {
         colSep = DEFAULT_COLSEP;
@@ -44,7 +45,11 @@ public class CSVReader extends ValueMatrixReader {
 
     @Override
     protected ValueMatrix read() throws IOException {
-        stream = new BufferedInputStream(new FileInputStream(file));
+        stream = new FileInputStream(file);
+        FileLock lock = stream.getChannel().tryLock(0, Long.MAX_VALUE, true);
+        if(lock == null) {
+            throw new IOException("Could not lock \"" + path + "\".");
+        }
 
         boolean hasVals = readLine();
         headers = line.split(colSep);
@@ -63,15 +68,19 @@ public class CSVReader extends ValueMatrixReader {
                 numRows++;
                 parseLineQuoted();
             }
-            numRows++;
-            parseLineQuoted();
+            if(!line.isEmpty()) {
+                numRows++;
+                parseLineQuoted();
+            }
         } else {
             while(readLine()) {
                 numRows++;
                 parseLine();
             }
-            numRows++;
-            parseLine();
+            if(!line.isEmpty()) {
+                numRows++;
+                parseLine();
+            }
         }
 
         stream.close();
@@ -122,14 +131,12 @@ public class CSVReader extends ValueMatrixReader {
         while(curChar != -1) {
             line += ((char) curChar);
             if(line.endsWith(rowSep)) {
-                break;
+                line = line.substring(0, line.length() - rowSep.length());
+                return true;
             }
             curChar = stream.read();
         }
-        if(curChar == -1) {
-            return false;
-        }
-        line = line.substring(0, line.length() - rowSep.length());
-        return true;
+
+        return false;
     }
 }

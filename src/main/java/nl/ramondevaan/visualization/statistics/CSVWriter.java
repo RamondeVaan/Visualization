@@ -2,15 +2,16 @@ package nl.ramondevaan.visualization.statistics;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.util.List;
 
 public class CSVWriter extends ValueMatrixWriter {
     public static final String DEFAULT_COLSEP = ",";
     public static final String DEFAULT_ROWSEP = System.lineSeparator();
 
-    private String colSep;
-    private String rowSep;
+    private String  colSep;
+    private String  rowSep;
     private boolean quoted;
     
     public CSVWriter() {
@@ -38,54 +39,62 @@ public class CSVWriter extends ValueMatrixWriter {
 
     @Override
     protected void write(ValueMatrix matrix) throws IOException {
-        try (PrintWriter writer = new PrintWriter(new FileOutputStream(file))) {
-            final int headerLength = matrix.headers.size();
-            final int numberOfRows = matrix.numberOfRows;
+        FileOutputStream    stream  = new FileOutputStream(path, false);
+        FileChannel         channel = stream.getChannel();
+        FileLock            lock    = channel.tryLock(0, Long.MAX_VALUE, false);
 
-            String[] headers;
-            String[] values;
+        if(lock == null) {
+            throw new IOException("Could not lock \"" + path + "\".");
+        }
 
-            if(quoted) {
-                headers = getQuoted(matrix.headers);
-                values = getQuoted(matrix.values);
-            } else {
-                headers = matrix.headers.toArray(new String[matrix.headers.size()]);
-                values = matrix.values.toArray(new String[matrix.values.size()]);
+        final int headerLength = matrix.headers.size();
+        final int numberOfRows = matrix.numberOfRows;
+
+        String[] headers;
+        String[] values;
+
+        if(quoted) {
+            headers = getQuoted(matrix.headers);
+            values = getQuoted(matrix.values);
+        } else {
+            headers = matrix.headers.toArray(new String[matrix.headers.size()]);
+            values = matrix.values.toArray(new String[matrix.values.size()]);
+        }
+
+        if(headerLength > 0) {
+            int i;
+            for (i = 0; i < headerLength - 1; i++) {
+                stream.write(headers[i].getBytes());
+                stream.write(colSep.getBytes());
             }
+            stream.write(headers[i].getBytes());
 
-            if(headerLength > 0) {
-                int i;
-                for (i = 0; i < headerLength - 1; i++) {
-                    writer.write(headers[i]);
-                    writer.write(colSep);
+            String s;
+            if(values.length > 0) {
+                stream.write(rowSep.getBytes());
+                int k = 0;
+                for (int j = 0; j < headerLength - 1; j++) {
+                    s = values[k++];
+                    stream.write((s == null ? "" : s).getBytes());
+                    stream.write(colSep.getBytes());
                 }
-                writer.write(headers[i]);
+                s = values[k++];
+                stream.write((s == null ? "" : s).getBytes());
 
-                String s;
-                if(values.length > 0) {
-                    writer.write(rowSep);
-                    int k = 0;
+                for (i = 1; i < numberOfRows; i++) {
+                    stream.write(rowSep.getBytes());
                     for (int j = 0; j < headerLength - 1; j++) {
                         s = values[k++];
-                        writer.write(s == null ? "" : s);
-                        writer.write(colSep);
+                        stream.write((s == null ? "" : s).getBytes());
+                        stream.write(colSep.getBytes());
                     }
                     s = values[k++];
-                    writer.write(s == null ? "" : s);
-
-                    for (i = 1; i < numberOfRows; i++) {
-                        writer.write(rowSep);
-                        for (int j = 0; j < headerLength - 1; j++) {
-                            s = values[k++];
-                            writer.write(s == null ? "" : s);
-                            writer.write(colSep);
-                        }
-                        s = values[k++];
-                        writer.write(s == null ? "" : s);
-                    }
+                    stream.write((s == null ? "" : s).getBytes());
                 }
             }
         }
+
+        stream.close();
     }
     
     private static String[] getQuoted(List<String> values) {

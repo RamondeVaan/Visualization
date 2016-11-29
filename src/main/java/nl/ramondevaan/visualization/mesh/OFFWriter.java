@@ -22,9 +22,8 @@ public class OFFWriter extends MeshWriter {
         stream  = new FileOutputStream(path, false);
 
         FileLock lock = stream.getChannel().tryLock(0, Long.MAX_VALUE, false);
-
         if(lock == null) {
-            throw new IllegalArgumentException("Could not lock file");
+            throw new IOException("Could not lock \"" + path + "\".");
         }
 
         writeLine("OFF");
