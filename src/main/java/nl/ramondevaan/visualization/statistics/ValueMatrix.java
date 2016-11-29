@@ -50,6 +50,12 @@ public class ValueMatrix {
         this.values = Collections.unmodifiableList(Arrays.asList(values));
     }
 
+    ValueMatrix(List<String> headers, List<String> values, int numberOfRows) {
+        this.numberOfRows = numberOfRows;
+        this.headers = Collections.unmodifiableList(headers);
+        this.values = Collections.unmodifiableList(values);
+    }
+
     public final int getNumberOfRows() {
         return numberOfRows;
     }

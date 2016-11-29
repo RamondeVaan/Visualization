@@ -5,7 +5,7 @@ import nl.ramondevaan.visualization.core.Filter;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CombineValueMatricesFilter extends Filter<ValueMatrix, ValueMatrix> {
+public class CombineValueMatricesRowFilter extends Filter<ValueMatrix, ValueMatrix> {
 
     @Override
     protected ValueMatrix updateImpl() throws Exception {
