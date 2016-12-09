@@ -94,12 +94,13 @@ public class MeshShift extends Filter<Mesh, Mesh> {
                                 coords.get(j).get(i) + shift.get(j));
                     }
                 });
+        shift.rewind();
 
         List<Property> vertexProperties = new ArrayList<>();
         coordPropInd.rewind();
 
         vertexProperties.addAll(input.vertexElement.properties);
-        for(int i = 0; coordPropInd.hasRemaining(); i++) {
+        for(int i = 0; i < shift.remaining(); i++) {
             int k = coordPropInd.get();
             vertexProperties.set(k, new Property(
                     vertexProperties.get(k).name,
