@@ -99,7 +99,7 @@ public class ImageExtend extends Filter<Image, Image> {
     
         //Compute the extension used (based on dimensionality)
         IntBuffer extensionUsed = IntBuffer.allocate(input.dimensionality);
-        extension.limit(input.dimensionality);
+        extension.limit(Math.min(input.dimensionality, extension.capacity()));
         extension.rewind();
         extensionUsed.put(extension);
         while(extensionUsed.hasRemaining()) {

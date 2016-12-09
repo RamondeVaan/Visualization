@@ -98,7 +98,7 @@ public class ImageShift extends Filter<Image, Image> {
     
         //Compute the extension used (based on dimensionality)
         IntBuffer shiftUsed = IntBuffer.allocate(input.dimensionality);
-        shift.limit(input.dimensionality);
+        shift.limit(Math.min(input.dimensionality, shift.capacity()));
         shift.rewind();
         shiftUsed.put(shift);
         while(shiftUsed.hasRemaining()) {

@@ -99,7 +99,7 @@ public class ImageShiftExtend extends Filter<Image, Image> {
     
         //Compute the extension used (based on dimensionality)
         IntBuffer shiftUsed = IntBuffer.allocate(input.dimensionality);
-        shift.limit(input.dimensionality);
+        shift.limit(Math.min(input.dimensionality, shift.capacity()));
         shift.rewind();
         shiftUsed.put(shift);
         while(shiftUsed.hasRemaining()) {
@@ -124,7 +124,7 @@ public class ImageShiftExtend extends Filter<Image, Image> {
         int         ext;
     
         IntBuffer       inputDimensions = input         .getDimensions();
-        DoubleBuffer inputOrigin     = input         .getOrigin();
+        DoubleBuffer    inputOrigin     = input         .getOrigin();
         DoubleBuffer    inputSpacing    = input         .getSpacing();
         DoubleBuffer    origin          = DoubleBuffer  .allocate(dimensionality);
         IntBuffer       dimensions      = IntBuffer     .allocate(dimensionality);
