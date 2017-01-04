@@ -52,7 +52,7 @@ public class CSVReader extends ValueMatrixReader {
         }
 
         boolean hasVals = readLine();
-        headers = line.split(colSep);
+        headers = line.split(colSep, -1);
         valuesList = new ArrayList<>();
 
         if(!hasVals) {
@@ -88,7 +88,7 @@ public class CSVReader extends ValueMatrixReader {
     }
 
     private void parseLine() throws IOException {
-        values = line.split(colSep);
+        values = line.split(colSep, -1);
         if(values.length != headers.length) {
             throw new IOException("Incorrect number of columns in row");
         }
@@ -98,7 +98,7 @@ public class CSVReader extends ValueMatrixReader {
     }
 
     private void parseLineQuoted() throws IOException {
-        values = line.split(colSep);
+        values = line.split(colSep, -1);
         if(values.length != headers.length) {
             throw new IOException("Incorrect number of columns in row");
         }
